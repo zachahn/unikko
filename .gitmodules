@@ -1,0 +1,3 @@
+[submodule "canon"]
+	path = canon
+	url = https://github.com/textile/php-textile.git
