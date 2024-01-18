@@ -1,4 +1,4 @@
-use crate::lexer::LexerToken;
+use crate::lexer::Token;
 use regex::Regex;
 
 #[derive(Debug, PartialEq)]
@@ -57,7 +57,7 @@ impl Node {
     }
 }
 
-pub fn parse(lexer_tokens: Vec<LexerToken>) -> Result<Node, crate::Error> {
+pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::Error> {
     let mut stack = Vec::<Node>::new();
     let root = Node::Document(Vec::new());
     stack.push(root);
@@ -66,7 +66,7 @@ pub fn parse(lexer_tokens: Vec<LexerToken>) -> Result<Node, crate::Error> {
 
     for lexer_token in lexer_tokens.iter() {
         match lexer_token {
-            LexerToken::Line(string) => match block.captures(string) {
+            Token::Text(string) => match block.captures(string) {
                 Some(captures) => {
                     if let Some(last) = stack.last_mut() {
                         let block_tag = captures.name("block_tag").map_or("", |m| m.as_str());
@@ -128,16 +128,17 @@ pub fn parse(lexer_tokens: Vec<LexerToken>) -> Result<Node, crate::Error> {
                 }
                 None => unreachable!(),
             },
-            LexerToken::NewLine => {
+            Token::NewLine => {
                 if let Some(last) = stack.last_mut() {
                     last.push_node(Node::NewLine);
                 }
             }
-            LexerToken::Eof => {
+            Token::Eof => {
                 if let Some(last) = stack.last_mut() {
                     last.push_node(Node::Eof);
                 }
             }
+            _ => todo!(),
         }
     }
 
@@ -160,11 +161,11 @@ mod tests {
     #[test]
     fn blocks() {
         let input = vec![
-            LexerToken::Line("h1. hello 😁".to_string()),
-            LexerToken::NewLine,
-            LexerToken::NewLine,
-            LexerToken::Line("yay".to_string()),
-            LexerToken::Eof,
+            Token::Text("h1. hello 😁".to_string()),
+            Token::NewLine,
+            Token::NewLine,
+            Token::Text("yay".to_string()),
+            Token::Eof,
         ];
         let nodes = parse(input).unwrap();
         assert_eq!(
