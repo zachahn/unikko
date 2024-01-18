@@ -4,7 +4,7 @@ mod lexer;
 mod parser;
 
 pub use lexer::tokenize;
-pub use parser::{parse, Node, Token};
+pub use parser::{parse, Node};
 
 #[derive(Error, Debug)]
 pub enum Error {

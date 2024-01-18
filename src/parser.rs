@@ -1,50 +1,44 @@
 use crate::lexer::LexerToken;
 
 #[derive(Debug, PartialEq)]
-pub enum Token {
-    Document,
+pub enum Node {
     NewLine,
     Eof,
+    Document(Vec<Node>),
     Text(String),
-    P(String),
-    H1(String),
-    H2(String),
-    H3(String),
-    H4(String),
-    H5(String),
-    H6(String),
+    P(Vec<Node>),
+    H1(Vec<Node>),
+    H2(Vec<Node>),
+    H3(Vec<Node>),
+    H4(Vec<Node>),
+    H5(Vec<Node>),
+    H6(Vec<Node>),
     Pre(String),
     BlockCode(String),
-    BlockQuote(String),
+    BlockQuote(Vec<Node>),
     NoTextile(String),
     Html(String),
-    Unknown(String),
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Node {
-    token: Token,
-    children: Vec<Node>,
 }
 
 impl Node {
-    pub fn new(token: Token) -> Self {
-        Self {
-            token: token,
-            children: Vec::new(),
+    fn push_node(&mut self, node: Node) {
+        match *self {
+            Self::P(ref mut nodes)
+            | Self::BlockQuote(ref mut nodes)
+            | Self::H1(ref mut nodes)
+            | Self::H2(ref mut nodes)
+            | Self::H3(ref mut nodes)
+            | Self::H4(ref mut nodes)
+            | Self::H5(ref mut nodes)
+            | Self::H6(ref mut nodes)
+            | Self::Document(ref mut nodes) => nodes.push(node),
+            _ => unreachable!(),
         }
     }
-
-    // pub fn new(token: Token, children: Vec<Node>) {
-    //     Self {
-    //         token: token,
-    //         children: children,
-    //     }
-    // }
 }
 
 pub fn parse(lexer_tokens: Vec<LexerToken>) -> Result<Node, crate::Error> {
-    let root = Node::new(Token::Document);
+    let root = Node::Document(Vec::new());
     let mut stack = vec![root];
 
     for lexer_token in lexer_tokens.iter() {
@@ -52,12 +46,12 @@ pub fn parse(lexer_tokens: Vec<LexerToken>) -> Result<Node, crate::Error> {
             LexerToken::Line(string) => {}
             LexerToken::NewLine => {
                 if let Some(last) = stack.last_mut() {
-                    last.children.push(Node::new(Token::NewLine));
+                    last.push_node(Node::NewLine);
                 }
             }
             LexerToken::Eof => {
                 if let Some(last) = stack.last_mut() {
-                    last.children.push(Node::new(Token::Eof));
+                    last.push_node(Node::Eof);
                 }
             }
         }
@@ -91,16 +85,13 @@ mod tests {
         let nodes = parse(input).unwrap();
         assert_eq!(
             nodes,
-            Node {
-                token: Token::Document,
-                children: vec!(
-                    Node::new(Token::H1("hello 😁".to_string())),
-                    Node::new(Token::NewLine),
-                    Node::new(Token::NewLine),
-                    Node::new(Token::Text("yay".to_string())),
-                    Node::new(Token::Eof),
-                )
-            },
+            Node::Document(vec!(
+                Node::H1(vec!(Node::Text("hello 😁".to_string()))),
+                Node::NewLine,
+                Node::NewLine,
+                Node::Text("yay".to_string()),
+                Node::Eof,
+            ))
         );
     }
 }
