@@ -1,49 +1,133 @@
 use crate::lexer::LexerToken;
+use regex::Regex;
+
+#[derive(Debug, PartialEq)]
+pub struct Attributes {
+    unparsed: String,
+}
+
+impl Attributes {
+    fn new() -> Self {
+        Self {
+            unparsed: String::new(),
+        }
+    }
+}
+
+use Attributes as A;
 
 #[derive(Debug, PartialEq)]
 pub enum Node {
     NewLine,
     Eof,
+
     Document(Vec<Node>),
+
     Text(String),
-    P(Vec<Node>),
-    H1(Vec<Node>),
-    H2(Vec<Node>),
-    H3(Vec<Node>),
-    H4(Vec<Node>),
-    H5(Vec<Node>),
-    H6(Vec<Node>),
-    Pre(String),
-    BlockCode(String),
-    BlockQuote(Vec<Node>),
     NoTextile(String),
     Html(String),
+
+    Pre(String, A),
+    BlockCode(String, A),
+
+    BlockQuote(Vec<Node>, A),
+    H1(Vec<Node>, A),
+    H2(Vec<Node>, A),
+    H3(Vec<Node>, A),
+    H4(Vec<Node>, A),
+    H5(Vec<Node>, A),
+    H6(Vec<Node>, A),
+    P(Vec<Node>, A),
 }
 
 impl Node {
     fn push_node(&mut self, node: Node) {
-        match *self {
-            Self::P(ref mut nodes)
-            | Self::BlockQuote(ref mut nodes)
-            | Self::H1(ref mut nodes)
-            | Self::H2(ref mut nodes)
-            | Self::H3(ref mut nodes)
-            | Self::H4(ref mut nodes)
-            | Self::H5(ref mut nodes)
-            | Self::H6(ref mut nodes)
-            | Self::Document(ref mut nodes) => nodes.push(node),
+        match self {
+            Self::P(nodes, _)
+            | Self::BlockQuote(nodes, _)
+            | Self::H1(nodes, _)
+            | Self::H2(nodes, _)
+            | Self::H3(nodes, _)
+            | Self::H4(nodes, _)
+            | Self::H5(nodes, _)
+            | Self::H6(nodes, _)
+            | Self::Document(nodes) => nodes.push(node),
             _ => unreachable!(),
         }
     }
 }
 
 pub fn parse(lexer_tokens: Vec<LexerToken>) -> Result<Node, crate::Error> {
+    let mut stack = Vec::<Node>::new();
     let root = Node::Document(Vec::new());
-    let mut stack = vec![root];
+    stack.push(root);
+
+    let block = Regex::new(r"^(?:(?<block_tag>(h[1-6]|p)+.)\s)?(?<rest>\s*.*)$").unwrap();
 
     for lexer_token in lexer_tokens.iter() {
         match lexer_token {
-            LexerToken::Line(string) => {}
+            LexerToken::Line(string) => match block.captures(string) {
+                Some(captures) => {
+                    if let Some(last) = stack.last_mut() {
+                        let block_tag = captures.name("block_tag").map_or("", |m| m.as_str());
+                        let rest = &captures["rest"];
+                        match block_tag {
+                            "h1." => {
+                                let mut node = Node::H1(Vec::new(), A::new());
+                                if rest.len() > 0 {
+                                    node.push_node(Node::Text(rest.to_string()));
+                                }
+                                last.push_node(node);
+                            }
+                            "h2." => {
+                                let mut node = Node::H2(Vec::new(), A::new());
+                                if rest.len() > 0 {
+                                    node.push_node(Node::Text(rest.to_string()));
+                                }
+                                last.push_node(node);
+                            }
+                            "h3." => {
+                                let mut node = Node::H3(Vec::new(), A::new());
+                                if rest.len() > 0 {
+                                    node.push_node(Node::Text(rest.to_string()));
+                                }
+                                last.push_node(node);
+                            }
+                            "h4." => {
+                                let mut node = Node::H4(Vec::new(), A::new());
+                                if rest.len() > 0 {
+                                    node.push_node(Node::Text(rest.to_string()));
+                                }
+                                last.push_node(node);
+                            }
+                            "h5." => {
+                                let mut node = Node::H5(Vec::new(), A::new());
+                                if rest.len() > 0 {
+                                    node.push_node(Node::Text(rest.to_string()));
+                                }
+                                last.push_node(node);
+                            }
+                            "h6." => {
+                                let mut node = Node::H6(Vec::new(), A::new());
+                                if rest.len() > 0 {
+                                    node.push_node(Node::Text(rest.to_string()));
+                                }
+                                last.push_node(node);
+                            }
+                            "" => {
+                                if rest.len() > 0 {
+                                    last.push_node(Node::Text(rest.to_string()));
+                                }
+                            }
+                            _ => {
+                                println!("{:?}", block_tag);
+                                unreachable!()
+                            }
+                        }
+                    }
+                }
+                None => unreachable!(),
+            },
             LexerToken::NewLine => {
                 if let Some(last) = stack.last_mut() {
                     last.push_node(Node::NewLine);
@@ -74,7 +158,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn something_works() {
+    fn blocks() {
         let input = vec![
             LexerToken::Line("h1. hello 😁".to_string()),
             LexerToken::NewLine,
@@ -86,7 +170,7 @@ mod tests {
         assert_eq!(
             nodes,
             Node::Document(vec!(
-                Node::H1(vec!(Node::Text("hello 😁".to_string()))),
+                Node::H1(vec!(Node::Text("hello 😁".to_string())), A::new()),
                 Node::NewLine,
                 Node::NewLine,
                 Node::Text("yay".to_string()),
