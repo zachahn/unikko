@@ -1,33 +1,33 @@
 use std::io;
 
 #[derive(Debug, PartialEq)]
-pub enum Token {
+pub enum LexerToken {
     Line(String),
     NewLine,
     Eof,
 }
 
-pub fn tokenize(input: &mut dyn io::BufRead) -> Result<Vec<Token>, io::Error> {
-    let mut tokens = Vec::<Token>::new();
+pub fn tokenize(input: &mut dyn io::BufRead) -> Result<Vec<LexerToken>, io::Error> {
+    let mut tokens = Vec::<LexerToken>::new();
     let mut line = String::new();
 
     loop {
         match input.read_line(&mut line) {
             Ok(num) => {
                 if num == 0 {
-                    tokens.push(Token::Eof);
+                    tokens.push(LexerToken::Eof);
                     break;
                 }
                 match line.strip_suffix("\n") {
                     Some(stripped) => {
                         if stripped != "" {
-                            tokens.push(Token::Line(stripped.to_string()));
+                            tokens.push(LexerToken::Line(stripped.to_string()));
                         }
-                        tokens.push(Token::NewLine);
+                        tokens.push(LexerToken::NewLine);
                     }
                     None => {
                         if line != "" {
-                            tokens.push(Token::Line(line.clone()));
+                            tokens.push(LexerToken::Line(line.clone()));
                         }
                     }
                 };
@@ -50,7 +50,7 @@ mod tests {
         let tokens = tokenize(&mut input).unwrap();
         assert_eq!(
             tokens,
-            vec!(Token::Line("hello 😁".to_string()), Token::Eof)
+            vec!(LexerToken::Line("hello 😁".to_string()), LexerToken::Eof)
         );
     }
 
@@ -61,9 +61,9 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::Line("hello 😁".to_string()),
-                Token::NewLine,
-                Token::Eof
+                LexerToken::Line("hello 😁".to_string()),
+                LexerToken::NewLine,
+                LexerToken::Eof
             )
         );
     }
@@ -75,11 +75,11 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::Line("hello 😁".to_string()),
-                Token::NewLine,
-                Token::NewLine,
-                Token::Line("yay".to_string()),
-                Token::Eof
+                LexerToken::Line("hello 😁".to_string()),
+                LexerToken::NewLine,
+                LexerToken::NewLine,
+                LexerToken::Line("yay".to_string()),
+                LexerToken::Eof
             )
         );
     }
