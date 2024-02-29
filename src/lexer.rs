@@ -18,11 +18,12 @@ pub fn tokenize_1(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate:
 
     loop {
         match input.read_line(&mut line) {
-            Ok(num) => {
-                if num == 0 {
-                    tokens.push_back(Token::Eof);
-                    break;
-                }
+            Err(_) => return Err(crate::UnikkoError::LexerError),
+            Ok(0) => {
+                tokens.push_back(Token::Eof);
+                break;
+            }
+            Ok(_) => {
                 match line.strip_suffix("\n") {
                     Some(stripped) => {
                         if stripped != "" {
@@ -37,7 +38,6 @@ pub fn tokenize_1(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate:
                     }
                 };
             }
-            Err(_) => return Err(crate::UnikkoError::LexerError),
         }
         line.clear();
     }
@@ -67,7 +67,7 @@ pub fn tokenize_2(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::
                     }
                     result.push_back(Token::Text(rest.to_string()))
                 }
-                // NOTE: `tokenize_1` only tokenizes into three types. all other types are unreachable
+                // `tokenize_1` only returns one of three kinds of Tokens
                 _ => unreachable!(),
             },
         }
@@ -77,10 +77,10 @@ pub fn tokenize_2(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::
 }
 
 pub fn tokenize(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::UnikkoError> {
-    match tokenize_1(input) {
-        Ok(pass_1) => tokenize_2(pass_1),
-        Err(e) => Err(e),
-    }
+    let result1 = tokenize_1(input)?;
+    let result2 = tokenize_2(result1)?;
+
+    return Ok(result2);
 }
 
 #[cfg(test)]
