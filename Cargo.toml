@@ -10,3 +10,8 @@ license = "BSD-3-Clause"
 [dependencies]
 regex = "1.10.2"
 thiserror = "1.0"
+
+[dev-dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
