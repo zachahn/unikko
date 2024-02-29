@@ -7,7 +7,7 @@ pub use lexer::tokenize;
 pub use parser::{parse, Node};
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum UnikkoError {
     #[error("the lexer broke")]
     LexerError,
     #[error("the parser broke")]

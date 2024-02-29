@@ -12,7 +12,7 @@ pub enum Token {
     HtmlTag(String),
 }
 
-pub fn tokenize_1(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::Error> {
+pub fn tokenize_1(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::UnikkoError> {
     let mut tokens = VecDeque::<Token>::new();
     let mut line = String::new();
 
@@ -37,7 +37,7 @@ pub fn tokenize_1(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate:
                     }
                 };
             }
-            Err(_) => return Err(crate::Error::LexerError),
+            Err(_) => return Err(crate::UnikkoError::LexerError),
         }
         line.clear();
     }
@@ -45,7 +45,7 @@ pub fn tokenize_1(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate:
     Ok(tokens)
 }
 
-pub fn tokenize_2(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::Error> {
+pub fn tokenize_2(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::UnikkoError> {
     let mut result = VecDeque::<Token>::new();
 
     let block =
@@ -76,7 +76,7 @@ pub fn tokenize_2(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::
     return Ok(result);
 }
 
-pub fn tokenize(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::Error> {
+pub fn tokenize(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::UnikkoError> {
     match tokenize_1(input) {
         Ok(pass_1) => tokenize_2(pass_1),
         Err(e) => Err(e),
