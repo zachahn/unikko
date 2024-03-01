@@ -66,7 +66,7 @@ pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::UnikkoError> {
 
     for lexer_token in lexer_tokens.iter() {
         match lexer_token {
-            Token::Text(string) => match block.captures(string) {
+            Token::Unparsed(string) => match block.captures(string) {
                 Some(captures) => {
                     if let Some(last) = stack.last_mut() {
                         let block_tag = captures.name("block_tag").map_or("", |m| m.as_str());
@@ -161,10 +161,10 @@ mod tests {
     #[test]
     fn blocks() {
         let input = vec![
-            Token::Text("h1. hello 😁".to_string()),
+            Token::Unparsed("h1. hello 😁".to_string()),
             Token::NewLine,
             Token::NewLine,
-            Token::Text("yay".to_string()),
+            Token::Unparsed("yay".to_string()),
             Token::Eof,
         ];
         let nodes = parse(input).unwrap();
