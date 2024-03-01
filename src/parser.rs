@@ -57,7 +57,7 @@ impl Node {
     }
 }
 
-pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::UnikkoError> {
+pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::Error> {
     let mut stack = Vec::<Node>::new();
     let root = Node::Document(Vec::new());
     stack.push(root);
@@ -145,12 +145,12 @@ pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::UnikkoError> {
     match stack.pop() {
         Some(node) => {
             if stack.len() > 0 {
-                Err(crate::UnikkoError::ParserError)
+                Err(crate::Error::ParserError)
             } else {
                 Ok(node)
             }
         }
-        None => Err(crate::UnikkoError::ParserError),
+        None => Err(crate::Error::ParserError),
     }
 }
 

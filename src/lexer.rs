@@ -15,13 +15,13 @@ pub enum Token {
     BlockEnd,
 }
 
-fn tokenize_lines(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::UnikkoError> {
+fn tokenize_lines(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::Error> {
     let mut tokens = VecDeque::<Token>::new();
     let mut line = String::new();
 
     loop {
         match input.read_line(&mut line) {
-            Err(_) => return Err(crate::UnikkoError::LexerError),
+            Err(_) => return Err(crate::Error::LexerError),
             Ok(0) => {
                 tokens.push_back(Token::Eof);
                 break;
@@ -76,7 +76,7 @@ impl CurrentBlockProcessor {
     }
 }
 
-fn tokenize_blocks(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::UnikkoError> {
+fn tokenize_blocks(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::Error> {
     let mut result = VecDeque::<Token>::new();
     let mut current_block = CurrentBlockProcessor::new();
 
@@ -146,7 +146,7 @@ fn shove_block_into_result(
     count
 }
 
-pub fn tokenize(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::UnikkoError> {
+pub fn tokenize(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::Error> {
     let result1 = tokenize_lines(input)?;
     let result2 = tokenize_blocks(result1)?;
 
