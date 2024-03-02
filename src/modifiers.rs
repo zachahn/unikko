@@ -2,7 +2,7 @@ use regex::Regex;
 
 #[derive(Debug, PartialEq)]
 pub struct BlockTag {
-    pub signature: Option<String>,
+    pub signature: String,
     pub extended: bool,
     pub modifiers: Vec<String>,
     pub css: Option<String>,
@@ -12,7 +12,7 @@ pub struct BlockTag {
 
 impl BlockTag {
     pub fn new(
-        signature: Option<impl Into<String>>,
+        signature: impl Into<String>,
         extended: bool,
         modifiers: Vec<String>,
         css: Option<String>,
@@ -20,7 +20,7 @@ impl BlockTag {
         selector: Option<String>,
     ) -> Self {
         Self {
-            signature: signature.and_then(|s| Some(s.into())),
+            signature: signature.into(),
             extended: extended,
             modifiers: modifiers,
             css: css,
@@ -29,9 +29,8 @@ impl BlockTag {
         }
     }
 
-    fn blank() -> Self {
-        let sig: Option<String> = None;
-        Self::new(sig, false, Vec::new(), None, None, None)
+    fn blank(signature: impl Into<String>) -> Self {
+        Self::new(signature, false, Vec::new(), None, None, None)
     }
 }
 
@@ -52,15 +51,11 @@ pub fn extract_block(line: String) -> (Option<BlockTag>, String) {
     match captures {
         None => (None, line),
         Some(captures) => {
-            let mut block_tag = BlockTag::blank();
-            if let Some(signature) = captures.name("signature") {
-                block_tag.signature = Some(signature.as_str().to_string());
-            }
+            let signature = captures.name("signature").unwrap().as_str().to_string();
+            let inner = captures.name("inner").unwrap().as_str().to_string();
+            let block_tag = BlockTag::blank(signature);
 
-            (
-                Some(block_tag),
-                captures.name("inner").unwrap().as_str().to_string(),
-            )
+            (Some(block_tag), inner)
         }
     }
 }
@@ -71,7 +66,7 @@ mod tests {
 
     fn block_tag(signature: &str) -> BlockTag {
         BlockTag::new(
-            Some(signature.to_string()),
+            signature.to_string(),
             false,
             Vec::new(),
             None,

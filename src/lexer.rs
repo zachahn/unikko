@@ -230,7 +230,7 @@ mod tests {
     fn block_tags() {
         let mut input = io::Cursor::new("h1.  orange\n\nmocha. frappuccino\n");
         let tokens = tokenize(&mut input).unwrap();
-        let bt = BlockTag::new(Some("h1".to_string()), false, Vec::new(), None, None, None);
+        let bt = BlockTag::new("h1".to_string(), false, Vec::new(), None, None, None);
         assert_eq!(
             tokens,
             vec!(
