@@ -1,7 +1,6 @@
+use regex::Regex;
 use std::collections::VecDeque;
 use std::io;
-
-use crate::modifiers::{extract_block, BlockTag};
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
@@ -11,8 +10,21 @@ pub enum Token {
     Unparsed(String),
 
     // Phase 2
-    BlockStart(Option<BlockTag>),
+    // Lexers usually don't care about semantics, but it's helpful for the rest of the tokenizing
+    // process.
+    BlockStart,
     BlockEnd,
+
+    // Phase 3
+    SignatureStart(String),
+    SignatureEnd,
+    Modifier(String),
+    ParenOpen,
+    ParenClose,
+    SquareOpen,
+    SquareClose,
+    SquigglyOpen,
+    SquigglyClose,
 }
 
 fn tokenize_lines(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::Error> {
@@ -132,12 +144,9 @@ fn shove_block_into_result(
             Token::NewLine => result.push_back(wip_block),
             Token::Unparsed(line) => {
                 if count == 1 {
-                    let (block, inner) = extract_block(line);
-                    result.push_back(Token::BlockStart(block));
-                    result.push_back(Token::Unparsed(inner));
-                } else {
-                    result.push_back(Token::Unparsed(line));
+                    result.push_back(Token::BlockStart);
                 }
+                result.push_back(Token::Unparsed(line));
             }
             _ => unreachable!(),
         }
@@ -146,11 +155,65 @@ fn shove_block_into_result(
     count
 }
 
-pub fn tokenize(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::Error> {
-    let result1 = tokenize_lines(input)?;
-    let result2 = tokenize_blocks(result1)?;
+fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::Error> {
+    let mut result = VecDeque::<Token>::new();
+    let mut is_first_line = false;
 
-    return Ok(result2);
+    loop {
+        match input.pop_front() {
+            None => break,
+            Some(current) => match current {
+                Token::NewLine | Token::Eof | Token::BlockEnd => {
+                    if is_first_line {
+                        return Err(crate::Error::LexerError);
+                    }
+                    result.push_back(current);
+                }
+                Token::BlockStart => {
+                    if is_first_line {
+                        return Err(crate::Error::LexerError);
+                    }
+                    is_first_line = true;
+                    result.push_back(current);
+                }
+                Token::Unparsed(line) => {
+                    let mut added = false;
+                    if is_first_line {
+                        let pattern = Regex::new(
+                            "^(?<signature>p|h[1-6])(?<modifiers>[^.]*)\\. (?<inner>.*)$",
+                        )
+                        .unwrap();
+                        match pattern.captures(&line) {
+                            None => {}
+                            Some(captures) => {
+                                let mut buffer = VecDeque::<Token>::new();
+                                buffer.push_back(Token::SignatureStart(
+                                    captures["signature"].to_string(),
+                                ));
+                                buffer.push_back(Token::SignatureEnd);
+                                buffer.push_back(Token::Unparsed(captures["inner"].to_string()));
+                                result.append(&mut buffer);
+                                added = true;
+                            }
+                        }
+                    }
+                    is_first_line = false;
+                    if added == false {
+                        result.push_back(Token::Unparsed(line));
+                    }
+                }
+                _ => unreachable!("{:?}", current),
+            },
+        }
+    }
+
+    Ok(result)
+}
+
+pub fn tokenize(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::Error> {
+    tokenize_lines(input)
+        .and_then(tokenize_blocks)
+        .and_then(tokenize_signatures)
 }
 
 #[cfg(test)]
@@ -164,7 +227,7 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart(None),
+                Token::BlockStart,
                 Token::Unparsed("orange".to_string()),
                 Token::BlockEnd,
                 Token::Eof
@@ -179,7 +242,7 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart(None),
+                Token::BlockStart,
                 Token::Unparsed("orange".to_string()),
                 Token::NewLine,
                 Token::BlockEnd,
@@ -195,12 +258,12 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart(None),
+                Token::BlockStart,
                 Token::Unparsed("hello 😁".to_string()),
                 Token::NewLine,
                 Token::NewLine,
                 Token::BlockEnd,
-                Token::BlockStart(None),
+                Token::BlockStart,
                 Token::Unparsed("yay".to_string()),
                 Token::BlockEnd,
                 Token::Eof
@@ -215,7 +278,7 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart(None),
+                Token::BlockStart,
                 Token::Unparsed("orange".to_string()),
                 Token::NewLine,
                 Token::Unparsed("mocha".to_string()),
@@ -230,16 +293,18 @@ mod tests {
     fn block_tags() {
         let mut input = io::Cursor::new("h1.  orange\n\nmocha. frappuccino\n");
         let tokens = tokenize(&mut input).unwrap();
-        let bt = BlockTag::new("h1".to_string(), false, Vec::new(), None, None, None);
+        // let bt = BlockTag::new("h1".to_string(), false, Vec::new(), None, None, None);
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart(Some(bt)),
+                Token::BlockStart,
+                Token::SignatureStart("h1".to_string()),
+                Token::SignatureEnd,
                 Token::Unparsed(" orange".to_string()),
                 Token::NewLine,
                 Token::NewLine,
                 Token::BlockEnd,
-                Token::BlockStart(None),
+                Token::BlockStart,
                 Token::Unparsed("mocha. frappuccino".to_string()),
                 Token::NewLine,
                 Token::BlockEnd,
@@ -262,6 +327,26 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(Token::NewLine, Token::NewLine, Token::NewLine, Token::Eof)
+        );
+    }
+
+    #[test]
+    fn modifiers() {
+        let mut input = io::Cursor::new("h1(so-hot). hansel");
+        let tokens = tokenize(&mut input).unwrap();
+        assert_eq!(
+            tokens,
+            vec!(
+                Token::BlockStart,
+                Token::SignatureStart("h1".to_string()),
+                Token::ParenOpen,
+                Token::Modifier("so-hot".to_string()),
+                Token::ParenClose,
+                Token::SignatureEnd,
+                Token::Unparsed("hansel".to_string()),
+                Token::BlockEnd,
+                Token::Eof
+            )
         );
     }
 }

@@ -128,14 +128,8 @@ pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::Error> {
                 }
                 None => unreachable!(),
             },
-            Token::BlockStart(block_tag) => match block_tag {
-                None => {
-                }
-                Some(block_tag) => {
-                }
-            }
-            Token::BlockEnd => {
-            }
+            Token::BlockStart => {}
+            Token::BlockEnd => {}
             Token::NewLine => {
                 if let Some(last) = stack.last_mut() {
                     last.push_node(Node::NewLine);

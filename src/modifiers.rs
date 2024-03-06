@@ -65,14 +65,7 @@ mod tests {
     use super::*;
 
     fn block_tag(signature: &str) -> BlockTag {
-        BlockTag::new(
-            signature.to_string(),
-            false,
-            Vec::new(),
-            None,
-            None,
-            None,
-        )
+        BlockTag::new(signature.to_string(), false, Vec::new(), None, None, None)
     }
 
     #[test]
