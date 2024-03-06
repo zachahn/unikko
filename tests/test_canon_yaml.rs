@@ -2,6 +2,7 @@ extern crate unikko;
 
 mod canon_fixtures;
 
+#[allow(unused_imports)]
 use anyhow::{anyhow, Result};
 use canon_fixtures::*;
 
