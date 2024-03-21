@@ -19,12 +19,12 @@ pub enum Token {
     SignatureStart(String),
     SignatureEnd,
     Modifier(String),
-    ParenOpen,
-    ParenClose,
-    SquareOpen,
-    SquareClose,
-    SquigglyOpen,
-    SquigglyClose,
+    ModifierParenOpen,
+    ModifierParenClose,
+    ModifierSquareOpen,
+    ModifierSquareClose,
+    ModifierCurlyOpen,
+    ModifierCurlyClose,
 }
 
 fn tokenize_lines(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::Error> {
@@ -190,6 +190,33 @@ fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, cr
                                 buffer.push_back(Token::SignatureStart(
                                     captures["signature"].to_string(),
                                 ));
+                                let modifiers = &captures["modifiers"];
+                                let mut start_of_str: Option<usize> = None;
+                                for (i, c) in modifiers.char_indices() {
+                                    match c {
+                                        '(' | ')' | '[' | ']' | '{' | '}' => {
+                                            if let Some(start) = start_of_str {
+                                                let sub = &modifiers[start..i];
+                                                buffer.push_back(Token::Modifier(sub.to_string()));
+                                                start_of_str = None;
+                                            }
+                                            match c {
+                                                '(' => buffer.push_back(Token::ModifierParenOpen),
+                                                ')' => buffer.push_back(Token::ModifierParenClose),
+                                                '[' => buffer.push_back(Token::ModifierSquareOpen),
+                                                ']' => buffer.push_back(Token::ModifierSquareClose),
+                                                '{' => buffer.push_back(Token::ModifierCurlyOpen),
+                                                '}' => buffer.push_back(Token::ModifierCurlyClose),
+                                                _ => unreachable!("{}", c),
+                                            }
+                                        }
+                                        _ => {
+                                            if start_of_str == None {
+                                                start_of_str = Some(i)
+                                            }
+                                        }
+                                    }
+                                }
                                 buffer.push_back(Token::SignatureEnd);
                                 buffer.push_back(Token::Unparsed(captures["inner"].to_string()));
                                 result.append(&mut buffer);
@@ -339,9 +366,9 @@ mod tests {
             vec!(
                 Token::BlockStart,
                 Token::SignatureStart("h1".to_string()),
-                Token::ParenOpen,
+                Token::ModifierParenOpen,
                 Token::Modifier("so-hot".to_string()),
-                Token::ParenClose,
+                Token::ModifierParenClose,
                 Token::SignatureEnd,
                 Token::Unparsed("hansel".to_string()),
                 Token::BlockEnd,
