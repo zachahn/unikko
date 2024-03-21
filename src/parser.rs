@@ -52,7 +52,7 @@ impl Node {
             | Self::H5(nodes, _)
             | Self::H6(nodes, _)
             | Self::Document(nodes) => nodes.push(node),
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", self),
         }
     }
 }
@@ -66,7 +66,7 @@ pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::Error> {
 
     for lexer_token in lexer_tokens.iter() {
         match lexer_token {
-            Token::Unparsed(string) => match block.captures(string) {
+            Token::Text(string) => match block.captures(string) {
                 Some(captures) => {
                     if let Some(last) = stack.last_mut() {
                         let block_tag = captures.name("block_tag").map_or("", |m| m.as_str());
@@ -159,26 +159,24 @@ pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
+    use std::io::Cursor;
 
     #[test]
-    fn blocks() {
-        let input = vec![
-            Token::Unparsed("h1. hello 😁".to_string()),
-            Token::NewLine,
-            Token::NewLine,
-            Token::Unparsed("yay".to_string()),
-            Token::Eof,
-        ];
-        let nodes = parse(input).unwrap();
+    fn blocks() -> Result<()> {
+        let mut input = Cursor::new("h1. they're\n\nin the computer");
+        let input = crate::tokenize(&mut input)?;
+        let nodes = parse(input)?;
         assert_eq!(
             nodes,
             Node::Document(vec!(
-                Node::H1(vec!(Node::Text("hello 😁".to_string())), A::new()),
+                Node::H1(vec!(Node::Text("they're 😁".to_string())), A::new()),
                 Node::NewLine,
                 Node::NewLine,
-                Node::Text("yay".to_string()),
+                Node::Text("in the computer".to_string()),
                 Node::Eof,
             ))
         );
+        Ok(())
     }
 }
