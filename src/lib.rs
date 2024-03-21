@@ -3,7 +3,6 @@ use thiserror::Error;
 mod convenience;
 mod error;
 mod lexer;
-mod modifiers;
 mod parser;
 mod renderer;
 
