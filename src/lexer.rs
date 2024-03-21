@@ -1,10 +1,11 @@
 use regex::Regex;
 use std::collections::VecDeque;
-use std::io;
+use std::io::BufRead;
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
     // Phase 1
+    // First, we read the entire input. We'll mark almost everything "Unparsed", then chip away at the unparsed bits
     NewLine,
     Eof,
     Unparsed(String),
@@ -16,6 +17,7 @@ pub enum Token {
     BlockEnd,
 
     // Phase 3
+    // Actually handle blocks
     SignatureStart(String),
     SignatureEnd,
     Modifier(String),
@@ -25,9 +27,12 @@ pub enum Token {
     ModifierSquareClose,
     ModifierCurlyOpen,
     ModifierCurlyClose,
+
+    // Final Phase
+    Text(String),
 }
 
-fn tokenize_lines(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::Error> {
+fn tokenize_lines(input: &mut dyn BufRead) -> Result<VecDeque<Token>, crate::Error> {
     let mut tokens = VecDeque::<Token>::new();
     let mut line = String::new();
 
@@ -237,130 +242,155 @@ fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, cr
     Ok(result)
 }
 
-pub fn tokenize(input: &mut dyn io::BufRead) -> Result<VecDeque<Token>, crate::Error> {
+fn tokenize_text(mut input: VecDeque<Token>) -> Result<Vec<Token>, crate::Error> {
+    let mut result = Vec::<Token>::new();
+
+    loop {
+        match input.pop_front() {
+            None => break,
+            Some(current) => match current {
+                Token::Unparsed(text) => result.push(Token::Text(text)),
+                _ => result.push(current),
+            },
+        }
+    }
+
+    Ok(result)
+}
+
+pub fn tokenize(input: &mut dyn BufRead) -> Result<Vec<Token>, crate::Error> {
     tokenize_lines(input)
         .and_then(tokenize_blocks)
         .and_then(tokenize_signatures)
+        .and_then(tokenize_text)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
+    use std::io::Cursor;
 
     #[test]
-    fn no_eol() {
-        let mut input = io::Cursor::new("orange".as_bytes());
-        let tokens = tokenize(&mut input).unwrap();
+    fn no_eol() -> Result<()> {
+        let mut input = Cursor::new("orange".as_bytes());
+        let tokens = tokenize(&mut input)?;
         assert_eq!(
             tokens,
             vec!(
                 Token::BlockStart,
-                Token::Unparsed("orange".to_string()),
+                Token::Text("orange".to_string()),
                 Token::BlockEnd,
                 Token::Eof
             )
         );
+        Ok(())
     }
 
     #[test]
-    fn with_eol() {
-        let mut input = io::Cursor::new("orange\n".as_bytes());
-        let tokens = tokenize(&mut input).unwrap();
+    fn with_eol() -> Result<()> {
+        let mut input = Cursor::new("orange\n".as_bytes());
+        let tokens = tokenize(&mut input)?;
         assert_eq!(
             tokens,
             vec!(
                 Token::BlockStart,
-                Token::Unparsed("orange".to_string()),
-                Token::NewLine,
-                Token::BlockEnd,
-                Token::Eof
-            )
-        );
-    }
-
-    #[test]
-    fn implicit_paragraphs() {
-        let mut input = io::Cursor::new("hello 😁\n\nyay".as_bytes());
-        let tokens = tokenize(&mut input).unwrap();
-        assert_eq!(
-            tokens,
-            vec!(
-                Token::BlockStart,
-                Token::Unparsed("hello 😁".to_string()),
-                Token::NewLine,
-                Token::NewLine,
-                Token::BlockEnd,
-                Token::BlockStart,
-                Token::Unparsed("yay".to_string()),
-                Token::BlockEnd,
-                Token::Eof
-            )
-        );
-    }
-
-    #[test]
-    fn linebreaks() {
-        let mut input = io::Cursor::new("orange\nmocha\n".as_bytes());
-        let tokens = tokenize(&mut input).unwrap();
-        assert_eq!(
-            tokens,
-            vec!(
-                Token::BlockStart,
-                Token::Unparsed("orange".to_string()),
-                Token::NewLine,
-                Token::Unparsed("mocha".to_string()),
+                Token::Text("orange".to_string()),
                 Token::NewLine,
                 Token::BlockEnd,
                 Token::Eof
             )
         );
+        Ok(())
     }
 
     #[test]
-    fn block_tags() {
-        let mut input = io::Cursor::new("h1.  orange\n\nmocha. frappuccino\n");
-        let tokens = tokenize(&mut input).unwrap();
-        // let bt = BlockTag::new("h1".to_string(), false, Vec::new(), None, None, None);
+    fn implicit_paragraphs() -> Result<()> {
+        let mut input = Cursor::new("hello 😁\n\nyay".as_bytes());
+        let tokens = tokenize(&mut input)?;
+        assert_eq!(
+            tokens,
+            vec!(
+                Token::BlockStart,
+                Token::Text("hello 😁".to_string()),
+                Token::NewLine,
+                Token::NewLine,
+                Token::BlockEnd,
+                Token::BlockStart,
+                Token::Text("yay".to_string()),
+                Token::BlockEnd,
+                Token::Eof
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn linebreaks() -> Result<()> {
+        let mut input = Cursor::new("orange\nmocha\n".as_bytes());
+        let tokens = tokenize(&mut input)?;
+        assert_eq!(
+            tokens,
+            vec!(
+                Token::BlockStart,
+                Token::Text("orange".to_string()),
+                Token::NewLine,
+                Token::Text("mocha".to_string()),
+                Token::NewLine,
+                Token::BlockEnd,
+                Token::Eof
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn block_tags() -> Result<()> {
+        let mut input = Cursor::new("h1.  orange\n\nmocha. frappuccino\n");
+        let tokens = tokenize(&mut input)?;
         assert_eq!(
             tokens,
             vec!(
                 Token::BlockStart,
                 Token::SignatureStart("h1".to_string()),
                 Token::SignatureEnd,
-                Token::Unparsed(" orange".to_string()),
+                Token::Text(" orange".to_string()),
                 Token::NewLine,
                 Token::NewLine,
                 Token::BlockEnd,
                 Token::BlockStart,
-                Token::Unparsed("mocha. frappuccino".to_string()),
+                Token::Text("mocha. frappuccino".to_string()),
                 Token::NewLine,
                 Token::BlockEnd,
                 Token::Eof
             )
         );
+        Ok(())
     }
 
     #[test]
-    fn empty_doc() {
-        let mut input = io::Cursor::new("");
-        let tokens = tokenize(&mut input).unwrap();
+    fn empty_doc() -> Result<()> {
+        let mut input = Cursor::new("");
+        let tokens = tokenize(&mut input)?;
         assert_eq!(tokens, vec!(Token::Eof));
+        Ok(())
     }
 
     #[test]
-    fn newlines_only_doc() {
-        let mut input = io::Cursor::new("\n\n\n");
-        let tokens = tokenize(&mut input).unwrap();
+    fn newlines_only_doc() -> Result<()> {
+        let mut input = Cursor::new("\n\n\n");
+        let tokens = tokenize(&mut input)?;
         assert_eq!(
             tokens,
             vec!(Token::NewLine, Token::NewLine, Token::NewLine, Token::Eof)
         );
+        Ok(())
     }
 
     #[test]
-    fn modifiers() {
-        let mut input = io::Cursor::new("h1(so-hot). hansel");
-        let tokens = tokenize(&mut input).unwrap();
+    fn modifiers() -> Result<()> {
+        let mut input = Cursor::new("h1(so-hot). hansel");
+        let tokens = tokenize(&mut input)?;
         assert_eq!(
             tokens,
             vec!(
@@ -370,10 +400,11 @@ mod tests {
                 Token::Modifier("so-hot".to_string()),
                 Token::ModifierParenClose,
                 Token::SignatureEnd,
-                Token::Unparsed("hansel".to_string()),
+                Token::Text("hansel".to_string()),
                 Token::BlockEnd,
                 Token::Eof
             )
         );
+        Ok(())
     }
 }
