@@ -78,9 +78,6 @@ impl CurrentBlockProcessor {
     }
 
     pub fn push_back(&mut self, token: Token) {
-        if self.backing.is_empty() {
-            println!("🤔 but why male models? {:?}", token);
-        }
         self.backing.push_back(token);
     }
 
@@ -138,9 +135,6 @@ fn shove_block_into_result(
     result: &mut VecDeque<Token>,
     current_block: &mut CurrentBlockProcessor,
 ) -> usize {
-    println!("🚽🚽🚽 PLUNGING!");
-    println!("🔎 {:?}", current_block);
-
     let mut count = 0;
 
     while let Some(wip_block) = current_block.pop_front() {
