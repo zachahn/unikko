@@ -102,7 +102,7 @@ fn tokenize_blocks(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate:
                 Token::Eof => {
                     let count = shove_block_into_result(&mut result, &mut current_block);
                     if count > 0 {
-                        result.push_back(Token::BlockEnd);
+                        close_block_with_newlines(&mut result);
                     }
                     result.push_back(current);
                     break;
@@ -110,10 +110,10 @@ fn tokenize_blocks(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate:
                 Token::NewLine => match current_block.back() {
                     Some(Token::NewLine) => {
                         let count = shove_block_into_result(&mut result, &mut current_block);
-                        result.push_back(current);
                         if count > 0 {
-                            result.push_back(Token::BlockEnd);
+                            close_block_with_newlines(&mut result);
                         }
+                        result.push_back(current);
                     }
                     Some(_) => {
                         current_block.push_back(current);
@@ -152,6 +152,25 @@ fn shove_block_into_result(
     }
 
     count
+}
+
+fn close_block_with_newlines(result: &mut VecDeque<Token>) {
+    let mut newlines_count = 0;
+    loop {
+        match result.back() {
+            Some(Token::NewLine) => {
+                result.pop_back();
+                newlines_count += 1;
+            }
+            Some(_) | None => {
+                break;
+            }
+        }
+    }
+    result.push_back(Token::BlockEnd);
+    for _ in 0..newlines_count {
+        result.push_back(Token::NewLine);
+    }
 }
 
 fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::Error> {
@@ -290,8 +309,8 @@ mod tests {
             vec!(
                 Token::BlockStart,
                 Token::Text("orange".to_string()),
-                Token::NewLine,
                 Token::BlockEnd,
+                Token::NewLine,
                 Token::Eof
             )
         );
@@ -307,9 +326,9 @@ mod tests {
             vec!(
                 Token::BlockStart,
                 Token::Text("hello 😁".to_string()),
-                Token::NewLine,
-                Token::NewLine,
                 Token::BlockEnd,
+                Token::NewLine,
+                Token::NewLine,
                 Token::BlockStart,
                 Token::Text("yay".to_string()),
                 Token::BlockEnd,
@@ -330,8 +349,8 @@ mod tests {
                 Token::Text("orange".to_string()),
                 Token::NewLine,
                 Token::Text("mocha".to_string()),
-                Token::NewLine,
                 Token::BlockEnd,
+                Token::NewLine,
                 Token::Eof
             )
         );
@@ -349,13 +368,13 @@ mod tests {
                 Token::SignatureStart("h1".to_string()),
                 Token::SignatureEnd,
                 Token::Text(" orange".to_string()),
-                Token::NewLine,
-                Token::NewLine,
                 Token::BlockEnd,
+                Token::NewLine,
+                Token::NewLine,
                 Token::BlockStart,
                 Token::Text("mocha. frappuccino".to_string()),
-                Token::NewLine,
                 Token::BlockEnd,
+                Token::NewLine,
                 Token::Eof
             )
         );

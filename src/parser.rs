@@ -1,7 +1,5 @@
 use crate::lexer::Token;
 use std::collections::VecDeque;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub struct Attributes {
@@ -10,20 +8,46 @@ pub struct Attributes {
 
 #[derive(Debug, PartialEq)]
 pub struct Document {
-    nodes: Vec<Node>,
+    pub nodes: Vec<Node>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Element {
-    identifier: String,
+    pub identifier: String,
     attrs: Attributes,
-    nodes: Vec<Node>,
+    pub nodes: Vec<Node>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Plain {
     identifier: String,
-    content: String,
+    pub content: String,
+}
+
+trait HasNodes {
+    fn push_node(&mut self, node: Node);
+    fn set_identifier(&mut self, identifier: String) -> Result<(), crate::Error>;
+}
+
+impl HasNodes for Document {
+    fn push_node(&mut self, node: Node) {
+        self.nodes.push(node);
+    }
+
+    fn set_identifier(&mut self, _identifier: String) -> Result<(), crate::Error> {
+        Err(crate::Error::ParserError)
+    }
+}
+
+impl HasNodes for Element {
+    fn push_node(&mut self, node: Node) {
+        self.nodes.push(node);
+    }
+
+    fn set_identifier(&mut self, identifier: String) -> Result<(), crate::Error> {
+        self.identifier = identifier;
+        Ok(())
+    }
 }
 
 impl Attributes {
@@ -76,95 +100,42 @@ pub enum Node {
     Plain(Plain),
 }
 
-impl Node {
-    fn push_node(&mut self, node: Node) {
-        match self {
-            Self::Document(n) => n.nodes.push(node),
-            Self::Element(n) => n.nodes.push(node),
-            _ => unreachable!("{:?}", self),
+fn recursively_parse(
+    lexer_tokens: &mut VecDeque<Token>,
+    parent: &mut dyn HasNodes,
+) -> Result<(), crate::Error> {
+    while let Some(lexer_token) = lexer_tokens.pop_front() {
+        match lexer_token {
+            Token::BlockStart => {
+                let mut block = Element::empty("p", Attributes::new());
+                recursively_parse(lexer_tokens, &mut block)?;
+                parent.push_node(Node::Element(block));
+            }
+            Token::BlockEnd => {
+                return Ok(());
+            }
+            Token::SignatureStart(identifier) => {
+                parent.set_identifier(identifier)?;
+            }
+            Token::SignatureEnd => {}
+            Token::NewLine => parent.push_node(Node::NewLine),
+            Token::Text(text) => parent.push_node(Node::Plain(Plain::new("text", text))),
+            Token::Eof => {
+                if !lexer_tokens.is_empty() {
+                    return Err(crate::Error::ParserError);
+                }
+                return Ok(());
+            }
+            _ => todo!("{:?}", lexer_token),
         }
     }
-}
-
-fn insert_implicit_element(
-    stack: &Vec<&mut Node>,
-    context: &VecDeque<Token>,
-) -> Result<(), crate::Error> {
-    match context.get(0) {
-        Some(Token::BlockStart) => {}
-        _ => Err(crate::Error::ParserError)?,
-    }
-
-    // if Some(&Token::SignatureStart) == context.get(1) {
-    //     return Ok(());
-    // }
-
-    // stack.push_back
     Ok(())
 }
 
 pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::Error> {
-    let mut stack = Vec::<&mut Node>::new();
-    let mut context = VecDeque::<Token>::new();
-    let mut root = Node::Document(Document::empty());
-    stack.push(&mut root);
-    println!("{:?}", lexer_tokens);
-
-    for lexer_token in lexer_tokens {
-        match lexer_token {
-            Token::NewLine => {
-                if let Some(last) = stack.last_mut() {
-                    last.push_node(Node::Plain(Plain::new("newline", "\n")))
-                }
-            }
-            Token::BlockStart => context.push_back(lexer_token),
-            Token::BlockEnd => {
-                println!("Popping stack");
-                stack.pop().ok_or(crate::Error::ParserError)?;
-            }
-            Token::SignatureStart(identifier) => {
-                println!("signaturestart");
-                match context.back() {
-                    Some(Token::BlockStart) => {
-                        context.push_back(Token::SignatureStart(identifier));
-                    }
-                    _ => Err(crate::Error::ParserError)?,
-                }
-            }
-            Token::SignatureEnd => {
-                match context.pop_front() {
-                    Some(Token::BlockStart) => {}
-                    _ => Err(crate::Error::ParserError)?,
-                }
-                println!("signatureend - text");
-                match context.pop_front() {
-                    Some(Token::SignatureStart(identifier)) => {
-                        let mut element = Node::Element(Element::empty(identifier, Attributes::new()));
-                        stack.push(&mut element);
-                        if let Some(last) = stack.last_mut() {
-                            last.push_node(element);
-                        }
-                    }
-                    // _ => Err(crate::Error::ParserError)?
-                    x => todo!("{:?}", x),
-                }
-            }
-            Token::Text(text) => {
-                insert_implicit_element(&stack, &context)?;
-                if let Some(last) = stack.last_mut() {
-                    last.push_node(Node::Plain(Plain::new("text", text)))
-                }
-            }
-            Token::Eof => {}
-            _ => todo!("{:?}", lexer_token),
-        }
-    }
-
-    if stack.len() == 1 {
-        Ok(root)
-    } else {
-        Err(crate::Error::ParserError)
-    }
+    let mut root = Document::empty();
+    recursively_parse(&mut VecDeque::from(lexer_tokens), &mut root)?;
+    return Ok(Node::Document(root));
 }
 
 #[cfg(test)]
