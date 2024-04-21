@@ -126,7 +126,14 @@ fn recursively_parse(
                 }
                 return Ok(());
             }
-            _ => todo!("{:?}", lexer_token),
+            Token::ModifierCurlyOpen => {}
+            Token::ModifierCurlyClose => {}
+            Token::ModifierParenOpen => {}
+            Token::ModifierParenClose => {}
+            Token::ModifierSquareOpen => {}
+            Token::ModifierSquareClose => {}
+            Token::Modifier(_) => {}
+            _ => todo!("{:?} (by parser)", lexer_token),
         }
     }
     Ok(())

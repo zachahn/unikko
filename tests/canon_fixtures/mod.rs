@@ -8,7 +8,8 @@ pub struct FixturesRoot {
 }
 
 pub struct FixtureSet {
-    iter: std::collections::hash_map::IntoIter<String, FixtureTestCase>,
+    pub cases: HashMap<String, FixtureTestCase>,
+    pub name: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -44,27 +45,16 @@ impl Iterator for FixturesRoot {
             None => None,
             Some(current) => {
                 let path = current.path();
-                println!("📁 📁 📁  {}", path.display());
+                let name = path.file_name().unwrap().to_str().unwrap().to_string();
+                // println!("📁 📁 📁  {}", path.display());
 
                 let contents = std::fs::read_to_string(path).unwrap();
                 let fixture_test_cases: HashMap<String, FixtureTestCase> =
                     serde_yaml::from_str(&contents).unwrap();
                 Some(Self::Item {
-                    iter: fixture_test_cases.into_iter(),
+                    cases: fixture_test_cases,
+                    name: name,
                 })
-            }
-        }
-    }
-}
-
-impl Iterator for FixtureSet {
-    type Item = (String, FixtureTestCase);
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.iter.next() {
-            None => None,
-            Some((name, fixture)) => {
-                println!("📁 {}", name);
-                Some((name, fixture))
             }
         }
     }
