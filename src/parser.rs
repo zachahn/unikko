@@ -1,9 +1,29 @@
 use crate::lexer::Token;
-use regex::Regex;
+use std::collections::VecDeque;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub struct Attributes {
     unparsed: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Document {
+    nodes: Vec<Node>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Element {
+    identifier: String,
+    attrs: Attributes,
+    nodes: Vec<Node>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Plain {
+    identifier: String,
+    content: String,
 }
 
 impl Attributes {
@@ -14,145 +34,136 @@ impl Attributes {
     }
 }
 
-use Attributes as A;
+impl Document {
+    pub fn new(nodes: Vec<Node>) -> Self {
+        Self { nodes: nodes }
+    }
+
+    pub fn empty() -> Self {
+        Self::new(vec![])
+    }
+}
+
+impl Element {
+    pub fn new(identifier: impl Into<String>, attrs: Attributes, nodes: Vec<Node>) -> Self {
+        Self {
+            identifier: identifier.into(),
+            attrs: attrs,
+            nodes: nodes,
+        }
+    }
+
+    pub fn empty(identifier: impl Into<String>, attrs: Attributes) -> Self {
+        Self::new(identifier, attrs, vec![])
+    }
+}
+
+impl Plain {
+    pub fn new(identifier: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            identifier: identifier.into(),
+            content: content.into(),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Node {
     NewLine,
-    Eof,
 
-    Document(Vec<Node>),
-
-    Text(String),
-    NoTextile(String),
-    Html(String),
-
-    Pre(String, A),
-    BlockCode(String, A),
-
-    BlockQuote(Vec<Node>, A),
-    H1(Vec<Node>, A),
-    H2(Vec<Node>, A),
-    H3(Vec<Node>, A),
-    H4(Vec<Node>, A),
-    H5(Vec<Node>, A),
-    H6(Vec<Node>, A),
-    P(Vec<Node>, A),
+    Document(Document),
+    Element(Element),
+    Plain(Plain),
 }
 
 impl Node {
     fn push_node(&mut self, node: Node) {
         match self {
-            Self::P(nodes, _)
-            | Self::BlockQuote(nodes, _)
-            | Self::H1(nodes, _)
-            | Self::H2(nodes, _)
-            | Self::H3(nodes, _)
-            | Self::H4(nodes, _)
-            | Self::H5(nodes, _)
-            | Self::H6(nodes, _)
-            | Self::Document(nodes) => nodes.push(node),
+            Self::Document(n) => n.nodes.push(node),
+            Self::Element(n) => n.nodes.push(node),
             _ => unreachable!("{:?}", self),
         }
     }
 }
 
+fn insert_implicit_element(
+    stack: &Vec<&mut Node>,
+    context: &VecDeque<Token>,
+) -> Result<(), crate::Error> {
+    match context.get(0) {
+        Some(Token::BlockStart) => {}
+        _ => Err(crate::Error::ParserError)?,
+    }
+
+    // if Some(&Token::SignatureStart) == context.get(1) {
+    //     return Ok(());
+    // }
+
+    // stack.push_back
+    Ok(())
+}
+
 pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::Error> {
-    let mut stack = Vec::<Node>::new();
-    let root = Node::Document(Vec::new());
-    stack.push(root);
+    let mut stack = Vec::<&mut Node>::new();
+    let mut context = VecDeque::<Token>::new();
+    let mut root = Node::Document(Document::empty());
+    stack.push(&mut root);
+    println!("{:?}", lexer_tokens);
 
-    let block = Regex::new(r"^(?:(?<block_tag>(h[1-6]|p)+.)\s)?(?<rest>\s*.*)$").unwrap();
-
-    for lexer_token in lexer_tokens.iter() {
+    for lexer_token in lexer_tokens {
         match lexer_token {
-            Token::Text(string) => match block.captures(string) {
-                Some(captures) => {
-                    if let Some(last) = stack.last_mut() {
-                        let block_tag = captures.name("block_tag").map_or("", |m| m.as_str());
-                        let rest = &captures["rest"];
-                        match block_tag {
-                            "h1." => {
-                                let mut node = Node::H1(Vec::new(), A::new());
-                                if rest.len() > 0 {
-                                    node.push_node(Node::Text(rest.to_string()));
-                                }
-                                last.push_node(node);
-                            }
-                            "h2." => {
-                                let mut node = Node::H2(Vec::new(), A::new());
-                                if rest.len() > 0 {
-                                    node.push_node(Node::Text(rest.to_string()));
-                                }
-                                last.push_node(node);
-                            }
-                            "h3." => {
-                                let mut node = Node::H3(Vec::new(), A::new());
-                                if rest.len() > 0 {
-                                    node.push_node(Node::Text(rest.to_string()));
-                                }
-                                last.push_node(node);
-                            }
-                            "h4." => {
-                                let mut node = Node::H4(Vec::new(), A::new());
-                                if rest.len() > 0 {
-                                    node.push_node(Node::Text(rest.to_string()));
-                                }
-                                last.push_node(node);
-                            }
-                            "h5." => {
-                                let mut node = Node::H5(Vec::new(), A::new());
-                                if rest.len() > 0 {
-                                    node.push_node(Node::Text(rest.to_string()));
-                                }
-                                last.push_node(node);
-                            }
-                            "h6." => {
-                                let mut node = Node::H6(Vec::new(), A::new());
-                                if rest.len() > 0 {
-                                    node.push_node(Node::Text(rest.to_string()));
-                                }
-                                last.push_node(node);
-                            }
-                            "" => {
-                                if rest.len() > 0 {
-                                    last.push_node(Node::Text(rest.to_string()));
-                                }
-                            }
-                            _ => {
-                                println!("{:?}", block_tag);
-                                unreachable!()
-                            }
-                        }
-                    }
-                }
-                None => unreachable!(),
-            },
-            Token::BlockStart => {}
-            Token::BlockEnd => {}
             Token::NewLine => {
                 if let Some(last) = stack.last_mut() {
-                    last.push_node(Node::NewLine);
+                    last.push_node(Node::Plain(Plain::new("newline", "\n")))
                 }
             }
-            Token::Eof => {
+            Token::BlockStart => context.push_back(lexer_token),
+            Token::BlockEnd => {
+                println!("Popping stack");
+                stack.pop().ok_or(crate::Error::ParserError)?;
+            }
+            Token::SignatureStart(identifier) => {
+                println!("signaturestart");
+                match context.back() {
+                    Some(Token::BlockStart) => {
+                        context.push_back(Token::SignatureStart(identifier));
+                    }
+                    _ => Err(crate::Error::ParserError)?,
+                }
+            }
+            Token::SignatureEnd => {
+                match context.pop_front() {
+                    Some(Token::BlockStart) => {}
+                    _ => Err(crate::Error::ParserError)?,
+                }
+                println!("signatureend - text");
+                match context.pop_front() {
+                    Some(Token::SignatureStart(identifier)) => {
+                        let mut element = Node::Element(Element::empty(identifier, Attributes::new()));
+                        stack.push(&mut element);
+                        if let Some(last) = stack.last_mut() {
+                            last.push_node(element);
+                        }
+                    }
+                    // _ => Err(crate::Error::ParserError)?
+                    x => todo!("{:?}", x),
+                }
+            }
+            Token::Text(text) => {
+                insert_implicit_element(&stack, &context)?;
                 if let Some(last) = stack.last_mut() {
-                    last.push_node(Node::Eof);
+                    last.push_node(Node::Plain(Plain::new("text", text)))
                 }
             }
+            Token::Eof => {}
             _ => todo!("{:?}", lexer_token),
         }
     }
 
-    match stack.pop() {
-        Some(node) => {
-            if stack.len() > 0 {
-                Err(crate::Error::ParserError)
-            } else {
-                Ok(node)
-            }
-        }
-        None => Err(crate::Error::ParserError),
+    if stack.len() == 1 {
+        Ok(root)
+    } else {
+        Err(crate::Error::ParserError)
     }
 }
 
@@ -161,6 +172,7 @@ mod tests {
     use super::*;
     use anyhow::Result;
     use std::io::Cursor;
+    use Attributes as A;
 
     #[test]
     fn blocks() -> Result<()> {
@@ -169,14 +181,29 @@ mod tests {
         let nodes = parse(input)?;
         assert_eq!(
             nodes,
-            Node::Document(vec!(
-                Node::H1(vec!(Node::Text("they're 😁".to_string())), A::new()),
+            doc(vec!(
+                h1(A::new(), vec!(text("they're"))),
                 Node::NewLine,
                 Node::NewLine,
-                Node::Text("in the computer".to_string()),
-                Node::Eof,
+                p(A::new(), vec!(text("in the computer"))),
             ))
         );
         Ok(())
+    }
+
+    fn doc(nodes: Vec<Node>) -> Node {
+        Node::Document(Document::new(nodes))
+    }
+
+    fn text(content: &str) -> Node {
+        Node::Plain(Plain::new("text", content))
+    }
+
+    fn h1(attrs: A, nodes: Vec<Node>) -> Node {
+        Node::Element(Element::new("h1", attrs, nodes))
+    }
+
+    fn p(attrs: A, nodes: Vec<Node>) -> Node {
+        Node::Element(Element::new("p", attrs, nodes))
     }
 }
