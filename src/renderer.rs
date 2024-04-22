@@ -1,5 +1,6 @@
 use crate::parser::Node;
 use crate::Error;
+use crate::Options;
 
 fn recursively_render(buffer: &mut String, node: Node) -> Result<(), crate::Error> {
     match node {
@@ -9,11 +10,15 @@ fn recursively_render(buffer: &mut String, node: Node) -> Result<(), crate::Erro
             }
         }
         Node::Element(element) => {
-            buffer.push_str(format!("<{}>", element.identifier).as_str());
+            let tag = match element.identifier.as_str() {
+                "bq" => "blockquote",
+                other => other,
+            };
+            buffer.push_str(format!("<{}>", tag).as_str());
             for child in element.nodes {
                 recursively_render(buffer, child)?
             }
-            buffer.push_str(format!("</{}>", element.identifier).as_str());
+            buffer.push_str(format!("</{}>", tag).as_str());
         }
         Node::Plain(plain) => buffer.push_str(plain.content.as_str()),
         Node::NewLine => {
@@ -23,7 +28,7 @@ fn recursively_render(buffer: &mut String, node: Node) -> Result<(), crate::Erro
     Ok(())
 }
 
-pub fn render(node: Node) -> Result<String, Error> {
+pub fn render(node: Node, _options: &Options) -> Result<String, Error> {
     let mut buffer = String::new();
     recursively_render(&mut buffer, node)?;
     Ok(buffer)

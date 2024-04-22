@@ -1,4 +1,5 @@
 use crate::lexer::Token;
+use crate::Options;
 use std::collections::VecDeque;
 
 #[derive(Debug, PartialEq)]
@@ -139,7 +140,7 @@ fn recursively_parse(
     Ok(())
 }
 
-pub fn parse(lexer_tokens: Vec<Token>) -> Result<Node, crate::Error> {
+pub fn parse(lexer_tokens: Vec<Token>, _options: &Options) -> Result<Node, crate::Error> {
     let mut root = Document::empty();
     recursively_parse(&mut VecDeque::from(lexer_tokens), &mut root)?;
     return Ok(Node::Document(root));
@@ -155,8 +156,9 @@ mod tests {
     #[test]
     fn blocks() -> Result<()> {
         let mut input = Cursor::new("h1. they're\n\nin the computer");
-        let input = crate::tokenize(&mut input)?;
-        let nodes = parse(input)?;
+        let options = Options::default();
+        let input = crate::tokenize(&mut input, &options)?;
+        let nodes = parse(input, &options)?;
         assert_eq!(
             nodes,
             doc(vec!(

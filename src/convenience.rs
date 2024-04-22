@@ -2,13 +2,21 @@ use crate::lexer::tokenize;
 use crate::parser::parse;
 use crate::renderer::render;
 use crate::Error;
+use crate::Options;
 use std::io::Cursor;
 
-pub fn textile_to_html<S: Into<String>>(textile: S) -> Result<String, Error> {
+pub fn textile_to_html_with_options(
+    textile: impl Into<String>,
+    options: Options,
+) -> Result<String, Error> {
     let mut input = Cursor::new(textile.into());
-    let tokens = tokenize(&mut input)?;
-    let tree = parse(tokens)?;
-    render(tree)
+    let tokens = tokenize(&mut input, &options)?;
+    let tree = parse(tokens, &options)?;
+    render(tree, &options)
+}
+
+pub fn textile_to_html(textile: impl Into<String>) -> Result<String, Error> {
+    textile_to_html_with_options(textile, Options::default())
 }
 
 #[cfg(test)]

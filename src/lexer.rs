@@ -1,3 +1,4 @@
+use crate::Options;
 use regex::Regex;
 use std::collections::VecDeque;
 use std::io::BufRead;
@@ -198,7 +199,7 @@ fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, cr
                     let mut added = false;
                     if is_first_line {
                         let pattern = Regex::new(
-                            "^(?<signature>p|h[1-6])(?<modifiers>[^.]*)\\. (?<inner>.*)$",
+                            "^(?<signature>p|h[1-6]|bq)(?<modifiers>[^.]*)\\. (?<inner>.*)$",
                         )
                         .unwrap();
                         match pattern.captures(&line) {
@@ -271,7 +272,7 @@ fn tokenize_text(mut input: VecDeque<Token>) -> Result<Vec<Token>, crate::Error>
     Ok(result)
 }
 
-pub fn tokenize(input: &mut dyn BufRead) -> Result<Vec<Token>, crate::Error> {
+pub fn tokenize(input: &mut dyn BufRead, _options: &Options) -> Result<Vec<Token>, crate::Error> {
     tokenize_lines(input)
         .and_then(tokenize_blocks)
         .and_then(tokenize_signatures)
@@ -287,7 +288,7 @@ mod tests {
     #[test]
     fn no_eol() -> Result<()> {
         let mut input = Cursor::new("orange".as_bytes());
-        let tokens = tokenize(&mut input)?;
+        let tokens = tokenize(&mut input, &Options::default())?;
         assert_eq!(
             tokens,
             vec!(
@@ -303,7 +304,7 @@ mod tests {
     #[test]
     fn with_eol() -> Result<()> {
         let mut input = Cursor::new("orange\n".as_bytes());
-        let tokens = tokenize(&mut input)?;
+        let tokens = tokenize(&mut input, &Options::default())?;
         assert_eq!(
             tokens,
             vec!(
@@ -320,7 +321,7 @@ mod tests {
     #[test]
     fn implicit_paragraphs() -> Result<()> {
         let mut input = Cursor::new("hello 😁\n\nyay".as_bytes());
-        let tokens = tokenize(&mut input)?;
+        let tokens = tokenize(&mut input, &Options::default())?;
         assert_eq!(
             tokens,
             vec!(
@@ -341,7 +342,7 @@ mod tests {
     #[test]
     fn linebreaks() -> Result<()> {
         let mut input = Cursor::new("orange\nmocha\n".as_bytes());
-        let tokens = tokenize(&mut input)?;
+        let tokens = tokenize(&mut input, &Options::default())?;
         assert_eq!(
             tokens,
             vec!(
@@ -360,7 +361,7 @@ mod tests {
     #[test]
     fn block_tags() -> Result<()> {
         let mut input = Cursor::new("h1.  orange\n\nmocha. frappuccino\n");
-        let tokens = tokenize(&mut input)?;
+        let tokens = tokenize(&mut input, &Options::default())?;
         assert_eq!(
             tokens,
             vec!(
@@ -384,7 +385,7 @@ mod tests {
     #[test]
     fn empty_doc() -> Result<()> {
         let mut input = Cursor::new("");
-        let tokens = tokenize(&mut input)?;
+        let tokens = tokenize(&mut input, &Options::default())?;
         assert_eq!(tokens, vec!(Token::Eof));
         Ok(())
     }
@@ -392,7 +393,7 @@ mod tests {
     #[test]
     fn newlines_only_doc() -> Result<()> {
         let mut input = Cursor::new("\n\n\n");
-        let tokens = tokenize(&mut input)?;
+        let tokens = tokenize(&mut input, &Options::default())?;
         assert_eq!(
             tokens,
             vec!(Token::NewLine, Token::NewLine, Token::NewLine, Token::Eof)
@@ -403,7 +404,7 @@ mod tests {
     #[test]
     fn modifiers() -> Result<()> {
         let mut input = Cursor::new("h1(so-hot). hansel");
-        let tokens = tokenize(&mut input)?;
+        let tokens = tokenize(&mut input, &Options::default())?;
         assert_eq!(
             tokens,
             vec!(
