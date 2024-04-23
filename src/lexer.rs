@@ -28,6 +28,7 @@ pub enum Token {
     ModifierSquareClose,
     ModifierCurlyOpen,
     ModifierCurlyClose,
+    ModifierExtended,
 
     // Final Phase
     Text(String),
@@ -199,7 +200,7 @@ fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, cr
                     let mut added = false;
                     if is_first_line {
                         let pattern = Regex::new(
-                            "^(?<signature>p|h[1-6]|bq)(?<modifiers>[^.]*)\\. (?<inner>.*)$",
+                            "^(?<signature>p|h[1-6]|bq)(?<modifiers>[^.]*)(?<extended>\\.\\.?) (?<inner>.*)$",
                         )
                         .unwrap();
                         match pattern.captures(&line) {
@@ -235,6 +236,9 @@ fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, cr
                                             }
                                         }
                                     }
+                                }
+                                if &captures["extended"] == ".." {
+                                    buffer.push_back(Token::ModifierExtended);
                                 }
                                 buffer.push_back(Token::SignatureEnd);
                                 buffer.push_back(Token::Unparsed(captures["inner"].to_string()));

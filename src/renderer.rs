@@ -1,18 +1,19 @@
-use crate::parser::Node;
+use crate::parser::{Node, Tag};
 use crate::Error;
 use crate::Options;
 
 fn recursively_render(buffer: &mut String, node: Node) -> Result<(), crate::Error> {
     match node {
-        Node::Document(doc) => {
-            for child in doc.nodes {
-                recursively_render(buffer, child)?
-            }
-        }
         Node::Element(element) => {
-            let tag = match element.identifier.as_str() {
-                "bq" => "blockquote",
-                other => other,
+            if element.identifier == Tag::Doc {
+                for child in element.nodes {
+                    recursively_render(buffer, child)?
+                }
+                return Ok(());
+            }
+            let tag = match element.identifier {
+                Tag::Bq => "blockquote".to_string(),
+                other => other.to_string(),
             };
             buffer.push_str(format!("<{}>", tag).as_str());
             for child in element.nodes {
