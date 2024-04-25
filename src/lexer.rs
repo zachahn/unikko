@@ -32,6 +32,9 @@ pub enum Token {
 
     // Final Phase
     Text(String),
+
+    // Other
+    NoOpPlaceholder,
 }
 
 fn tokenize_lines(input: &mut dyn BufRead) -> Result<VecDeque<Token>, crate::Error> {
@@ -260,15 +263,15 @@ fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, cr
     Ok(result)
 }
 
-fn tokenize_text(mut input: VecDeque<Token>) -> Result<Vec<Token>, crate::Error> {
-    let mut result = Vec::<Token>::new();
+fn tokenize_text(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::Error> {
+    let mut result = VecDeque::<Token>::new();
 
     loop {
         match input.pop_front() {
             None => break,
             Some(current) => match current {
-                Token::Unparsed(text) => result.push(Token::Text(text)),
-                _ => result.push(current),
+                Token::Unparsed(text) => result.push_back(Token::Text(text)),
+                _ => result.push_back(current),
             },
         }
     }
@@ -276,7 +279,10 @@ fn tokenize_text(mut input: VecDeque<Token>) -> Result<Vec<Token>, crate::Error>
     Ok(result)
 }
 
-pub fn tokenize(input: &mut dyn BufRead, _options: &Options) -> Result<Vec<Token>, crate::Error> {
+pub fn tokenize(
+    input: &mut dyn BufRead,
+    _options: &Options,
+) -> Result<VecDeque<Token>, crate::Error> {
     tokenize_lines(input)
         .and_then(tokenize_blocks)
         .and_then(tokenize_signatures)

@@ -120,6 +120,112 @@ pub enum Node {
     Plain(Plain),
 }
 
+struct PreparseContext {
+    tag: Option<String>,
+    extended: bool,
+}
+
+/// ## Handle blockquotes
+///
+/// 1. Wrap each implicit block inside a `bq` as a paragraph.
+/// 2. End on explicit bq
+fn preparse(mut lexer_tokens: VecDeque<Token>) -> VecDeque<Token> {
+    let mut result = VecDeque::<Token>::new();
+    let mut context = Vec::<PreparseContext>::new();
+    let mut placeholders = Vec::<usize>::new();
+
+    while let Some(token) = lexer_tokens.pop_front() {
+        match token {
+            Token::BlockStart => {
+                if let Some(current_ctx) = context.last() {
+                    if let Some(ref tag) = current_ctx.tag {
+                        if tag.as_str() == "bq" && current_ctx.extended {
+                            placeholders.push(context.len());
+                            result.push_back(Token::NoOpPlaceholder);
+                        }
+                    }
+                }
+                context.push(PreparseContext {
+                    tag: None,
+                    extended: false,
+                });
+                result.push_back(token);
+            }
+            Token::BlockEnd => {
+                let ended_context = context.pop().unwrap();
+                if ended_context.tag == None {
+                    if let Some(outer_ctx) = context.last() {
+                        if let Some(ref tag) = outer_ctx.tag {
+                            if tag.as_str() == "bq" {
+                                if !outer_ctx.extended {
+                                    result.push_back(Token::BlockEnd);
+                                    context.pop().unwrap();
+                                }
+                            }
+                        }
+                    }
+                }
+                result.push_back(token);
+            }
+            Token::SignatureStart(ref name) => {
+                let current = context.last_mut().unwrap();
+                current.tag = Some(name.to_string());
+                result.push_back(token);
+            }
+            Token::SignatureEnd => {
+                result.push_back(token);
+                let current = context.last_mut().unwrap();
+                if let Some(tag) = &current.tag {
+                    if tag.as_str() == "bq" {
+                        // Insert implicit paragraph
+                        result.push_back(Token::BlockStart);
+                        context.push(PreparseContext {
+                            tag: None,
+                            extended: false,
+                        });
+                    }
+                }
+            }
+            Token::ModifierExtended => {
+                let current = context.last_mut().unwrap();
+                if let Some(tag) = &current.tag {
+                    if tag.as_str() == "bq" {
+                        current.extended = true;
+                    }
+                }
+            }
+            _ => result.push_back(token),
+        };
+    }
+
+    return result;
+}
+
+/// Document trees are very shallow and often have a height of 1 (root -> p, root -> h1). There are
+/// some exceptions I'm aware of:
+///
+/// * `root -> bq -> p`
+///    * paragraphs are implicit, and they cannot have any modifiers. this is true for extended and
+///      non-extended blockquotes.
+/// * `root -> table -> ...`
+/// * Inline elements, though we can largely ignore that scenario here
+/// * `root -> bq -> p -> table` is not valid since paragraph tags cannot contain other block
+///   elements.
+///
+/// And as mentioned, we have to consider extended blocks. As far as I'm aware, the only _valid_
+/// and defined extended blocks are the following:
+///
+/// * `bq`
+/// * `bc`
+///
+/// This gives us a few permutations to work through:
+///
+/// * "regular" blocks
+/// * non-extended bc
+/// * non-extended bq
+/// * extended bc
+/// * extended bq
+/// * tables
 fn recursively_parse(
     lexer_tokens: &mut VecDeque<Token>,
     parent: &mut Element,
@@ -135,7 +241,13 @@ fn recursively_parse(
                 return Ok(());
             }
             Token::SignatureStart(identifier) => {
-                parent.set_identifier(identifier.into())?;
+                let identifier: Tag = identifier.into();
+                match identifier {
+                    Tag::Bq => {
+                        parent.set_identifier(identifier)?;
+                    }
+                    _ => parent.set_identifier(identifier)?,
+                };
             }
             Token::SignatureEnd => {}
             Token::NewLine => parent.push_node(Node::NewLine),
@@ -156,15 +268,17 @@ fn recursively_parse(
             Token::ModifierExtended => {
                 parent.extended = true;
             }
+            Token::NoOpPlaceholder => {}
             _ => todo!("{:?} (by parser)", lexer_token),
         }
     }
     Ok(())
 }
 
-pub fn parse(lexer_tokens: Vec<Token>, _options: &Options) -> Result<Node, crate::Error> {
+pub fn parse(lexer_tokens: VecDeque<Token>, _options: &Options) -> Result<Node, crate::Error> {
     let mut doc = Element::empty(Tag::Doc, Attributes::new());
-    recursively_parse(&mut VecDeque::from(lexer_tokens), &mut doc)?;
+    let mut lexer_tokens = preparse(lexer_tokens);
+    recursively_parse(&mut lexer_tokens, &mut doc)?;
     return Ok(Node::Element(doc));
 }
 
@@ -195,22 +309,27 @@ mod tests {
 
     #[test]
     fn blockquote_implicit_p() -> Result<()> {
-        let mut input = Cursor::new("bq. they're in the computer");
+        let mut input = Cursor::new("bq. they're in the computer\n\nthey're in the computer?");
         let options = Options::default();
         let input = crate::tokenize(&mut input, &options)?;
         let nodes = parse(input, &options)?;
         assert_eq!(
             nodes,
-            doc(vec!(bq(
-                A::new(),
-                vec!(p(A::new(), vec!(text("they're in the computer"))),)
-            )))
+            doc(vec!(
+                bq(
+                    A::new(),
+                    vec!(p(A::new(), vec!(text("they're in the computer"))),)
+                ),
+                n(),
+                n(),
+                p(A::new(), vec!(text("they're in the computer?")))
+            ))
         );
         Ok(())
     }
 
     #[test]
-    fn blockquote_multiple_p() -> Result<()> {
+    fn blockquote_extended_explicit_end() -> Result<()> {
         let mut input = Cursor::new("bq.. they're in the computer\n\nthey're in the computer?\n\np. what do they look like?");
         let options = Options::default();
         let input = crate::tokenize(&mut input, &options)?;
@@ -222,9 +341,13 @@ mod tests {
                     A::new(),
                     vec!(
                         p(A::new(), vec!(text("they're in the computer"))),
+                        n(),
+                        n(),
                         p(A::new(), vec!(text("they're in the computer?"))),
                     )
                 ),
+                n(),
+                n(),
                 p(A::new(), vec!(text("what do they look like?"))),
             ))
         );
@@ -237,6 +360,10 @@ mod tests {
 
     fn text(content: &str) -> Node {
         Node::Plain(Plain::new("text", content))
+    }
+
+    fn n() -> Node {
+        Node::NewLine
     }
 
     fn h1(attrs: A, nodes: Vec<Node>) -> Node {
