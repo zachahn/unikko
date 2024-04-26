@@ -14,11 +14,12 @@ pub enum Token {
     // Phase 2
     // Lexers usually don't care about semantics, but it's helpful for the rest of the tokenizing
     // process.
-    BlockStart,
+    BlockStartImplicit,
     BlockEnd,
 
     // Phase 3
     // Actually handle blocks
+    BlockStartExplicit,
     SignatureStart(String),
     SignatureEnd,
     Modifier(String),
@@ -32,9 +33,6 @@ pub enum Token {
 
     // Final Phase
     Text(String),
-
-    // Other
-    NoOpPlaceholder,
 }
 
 fn tokenize_lines(input: &mut dyn BufRead) -> Result<VecDeque<Token>, crate::Error> {
@@ -148,7 +146,7 @@ fn shove_block_into_result(
             Token::NewLine => result.push_back(wip_block),
             Token::Unparsed(line) => {
                 if count == 1 {
-                    result.push_back(Token::BlockStart);
+                    result.push_back(Token::BlockStartImplicit);
                 }
                 result.push_back(Token::Unparsed(line));
             }
@@ -159,7 +157,7 @@ fn shove_block_into_result(
     count
 }
 
-fn close_block_with_newlines(result: &mut VecDeque<Token>) {
+pub(crate) fn close_block_with_newlines(result: &mut VecDeque<Token>) {
     let mut newlines_count = 0;
     loop {
         match result.back() {
@@ -192,7 +190,7 @@ fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, cr
                     }
                     result.push_back(current);
                 }
-                Token::BlockStart => {
+                Token::BlockStartImplicit => {
                     if is_first_line {
                         return Err(crate::Error::LexerError);
                     }
@@ -209,6 +207,8 @@ fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, cr
                         match pattern.captures(&line) {
                             None => {}
                             Some(captures) => {
+                                assert_eq!(result.pop_back().unwrap(), Token::BlockStartImplicit);
+                                result.push_back(Token::BlockStartExplicit);
                                 let mut buffer = VecDeque::<Token>::new();
                                 buffer.push_back(Token::SignatureStart(
                                     captures["signature"].to_string(),
@@ -302,7 +302,7 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart,
+                Token::BlockStartImplicit,
                 Token::Text("orange".to_string()),
                 Token::BlockEnd,
                 Token::Eof
@@ -318,7 +318,7 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart,
+                Token::BlockStartImplicit,
                 Token::Text("orange".to_string()),
                 Token::BlockEnd,
                 Token::NewLine,
@@ -335,12 +335,12 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart,
+                Token::BlockStartImplicit,
                 Token::Text("hello 😁".to_string()),
                 Token::BlockEnd,
                 Token::NewLine,
                 Token::NewLine,
-                Token::BlockStart,
+                Token::BlockStartImplicit,
                 Token::Text("yay".to_string()),
                 Token::BlockEnd,
                 Token::Eof
@@ -356,7 +356,7 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart,
+                Token::BlockStartImplicit,
                 Token::Text("orange".to_string()),
                 Token::NewLine,
                 Token::Text("mocha".to_string()),
@@ -375,14 +375,14 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart,
+                Token::BlockStartExplicit,
                 Token::SignatureStart("h1".to_string()),
                 Token::SignatureEnd,
                 Token::Text(" orange".to_string()),
                 Token::BlockEnd,
                 Token::NewLine,
                 Token::NewLine,
-                Token::BlockStart,
+                Token::BlockStartImplicit,
                 Token::Text("mocha. frappuccino".to_string()),
                 Token::BlockEnd,
                 Token::NewLine,
@@ -418,7 +418,7 @@ mod tests {
         assert_eq!(
             tokens,
             vec!(
-                Token::BlockStart,
+                Token::BlockStartExplicit,
                 Token::SignatureStart("h1".to_string()),
                 Token::ModifierParenOpen,
                 Token::Modifier("so-hot".to_string()),

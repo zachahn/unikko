@@ -1,4 +1,4 @@
-use crate::lexer::Token;
+use crate::lexer::{close_block_with_newlines, Token};
 use crate::Options;
 use std::collections::VecDeque;
 use std::fmt;
@@ -120,79 +120,101 @@ pub enum Node {
     Plain(Plain),
 }
 
-struct PreparseContext {
-    tag: Option<String>,
-    extended: bool,
+#[derive(Debug, PartialEq)]
+enum PreparseContext {
+    Regular,
+    Bq,
+    BqExtended,
 }
 
-/// ## Handle blockquotes
+/// ## Handle regular blockquotes
 ///
-/// 1. Wrap each implicit block inside a `bq` as a paragraph.
-/// 2. End on explicit bq
+/// * On "block start"
+///     * Add <bq>
+///     * Add <p>
+/// * On "block end"
+///     * Add </p>
+///     * Add </bq>
+///
+/// # Handle extended blockquotes
+///
+/// Block, Tag(bq), Extended, ModifierEnd, Text, BlockEnd, Block, Text, BlockEnd
+///
+/// * On "block start"
+///     * Add <bq>
+///     * Add <p>
+/// * On "block end"
+///     * Add </p>
+///     * Add </bq>
+/// * On "block start"
+///     * If implicit paragraph
+///         * Remove </bq>
+///         * Add <p>
+///     * If explicit block
+///         * Mark blockquote status as false
+///         * Add <new block> tag
+///
 fn preparse(mut lexer_tokens: VecDeque<Token>) -> VecDeque<Token> {
     let mut result = VecDeque::<Token>::new();
-    let mut context = Vec::<PreparseContext>::new();
-    let mut placeholders = Vec::<usize>::new();
+    let mut contexts = Vec::<PreparseContext>::new();
 
     while let Some(token) = lexer_tokens.pop_front() {
         match token {
-            Token::BlockStart => {
-                if let Some(current_ctx) = context.last() {
-                    if let Some(ref tag) = current_ctx.tag {
-                        if tag.as_str() == "bq" && current_ctx.extended {
-                            placeholders.push(context.len());
-                            result.push_back(Token::NoOpPlaceholder);
-                        }
-                    }
+            Token::BlockStartImplicit => {
+                if contexts.last() != Some(&PreparseContext::BqExtended) {
+                    contexts.push(PreparseContext::Regular);
                 }
-                context.push(PreparseContext {
-                    tag: None,
-                    extended: false,
-                });
+                result.push_back(token);
+            }
+            Token::BlockStartExplicit => {
+                if contexts.last() == Some(&PreparseContext::BqExtended) {
+                    close_block_with_newlines(&mut result);
+                    contexts.pop();
+                }
+                contexts.push(PreparseContext::Regular);
                 result.push_back(token);
             }
             Token::BlockEnd => {
-                let ended_context = context.pop().unwrap();
-                if ended_context.tag == None {
-                    if let Some(outer_ctx) = context.last() {
-                        if let Some(ref tag) = outer_ctx.tag {
-                            if tag.as_str() == "bq" {
-                                if !outer_ctx.extended {
-                                    result.push_back(Token::BlockEnd);
-                                    context.pop().unwrap();
-                                }
-                            }
-                        }
+                match contexts.pop() {
+                    None => {
+                        unreachable!()
+                    }
+                    Some(PreparseContext::Regular) => {
+                        result.push_back(token);
+                    }
+                    Some(PreparseContext::Bq) => {
+                        result.push_back(Token::BlockEnd);
+                        result.push_back(token);
+                    }
+                    Some(PreparseContext::BqExtended) => {
+                        contexts.push(PreparseContext::BqExtended);
+                        // result.push_back(Token::BlockEnd);
+                        result.push_back(token);
                     }
                 }
-                result.push_back(token);
             }
             Token::SignatureStart(ref name) => {
-                let current = context.last_mut().unwrap();
-                current.tag = Some(name.to_string());
+                if name.as_str() == "bq" {
+                    contexts.pop();
+                    contexts.push(PreparseContext::Bq);
+                }
                 result.push_back(token);
             }
             Token::SignatureEnd => {
-                result.push_back(token);
-                let current = context.last_mut().unwrap();
-                if let Some(tag) = &current.tag {
-                    if tag.as_str() == "bq" {
-                        // Insert implicit paragraph
-                        result.push_back(Token::BlockStart);
-                        context.push(PreparseContext {
-                            tag: None,
-                            extended: false,
-                        });
-                    }
+                if contexts.last() == Some(&PreparseContext::Bq) {
+                    result.push_back(Token::BlockStartImplicit);
                 }
+                if contexts.last() == Some(&PreparseContext::BqExtended) {
+                    result.push_back(Token::BlockStartImplicit);
+                }
+                result.push_back(token);
             }
             Token::ModifierExtended => {
-                let current = context.last_mut().unwrap();
-                if let Some(tag) = &current.tag {
-                    if tag.as_str() == "bq" {
-                        current.extended = true;
-                    }
+                if contexts.last() == Some(&PreparseContext::Bq) {
+                    contexts.pop();
+                    contexts.push(PreparseContext::BqExtended);
                 }
+                result.push_back(token);
             }
             _ => result.push_back(token),
         };
@@ -232,7 +254,7 @@ fn recursively_parse(
 ) -> Result<(), crate::Error> {
     while let Some(lexer_token) = lexer_tokens.pop_front() {
         match lexer_token {
-            Token::BlockStart => {
+            Token::BlockStartImplicit | Token::BlockStartExplicit => {
                 let mut block = Element::empty(Tag::P, Attributes::new());
                 recursively_parse(lexer_tokens, &mut block)?;
                 parent.push_node(Node::Element(block));
@@ -268,7 +290,6 @@ fn recursively_parse(
             Token::ModifierExtended => {
                 parent.extended = true;
             }
-            Token::NoOpPlaceholder => {}
             _ => todo!("{:?} (by parser)", lexer_token),
         }
     }
@@ -337,7 +358,7 @@ mod tests {
         assert_eq!(
             nodes,
             doc(vec!(
-                bq(
+                bq_(
                     A::new(),
                     vec!(
                         p(A::new(), vec!(text("they're in the computer"))),
@@ -349,6 +370,35 @@ mod tests {
                 n(),
                 n(),
                 p(A::new(), vec!(text("what do they look like?"))),
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn extended_bq_then_bq() -> Result<()> {
+        let mut input = Cursor::new("bq.. they're in the computer\n\nthey're in the computer?\n\nbq.. what do they look like?");
+        let options = Options::default();
+        let input = crate::tokenize(&mut input, &options)?;
+        let nodes = parse(input, &options)?;
+        assert_eq!(
+            nodes,
+            doc(vec!(
+                bq_(
+                    A::new(),
+                    vec!(
+                        p(A::new(), vec!(text("they're in the computer"))),
+                        n(),
+                        n(),
+                        p(A::new(), vec!(text("they're in the computer?"))),
+                    )
+                ),
+                n(),
+                n(),
+                bq_(
+                    A::new(),
+                    vec!(p(A::new(), vec!(text("what do they look like?"))),)
+                ),
             ))
         );
         Ok(())
@@ -376,5 +426,11 @@ mod tests {
 
     fn bq(attrs: A, nodes: Vec<Node>) -> Node {
         Node::Element(Element::new(Tag::Bq, attrs, nodes))
+    }
+
+    fn bq_(attrs: A, nodes: Vec<Node>) -> Node {
+        let mut el = Element::new(Tag::Bq, attrs, nodes);
+        el.extended = true;
+        Node::Element(el)
     }
 }
