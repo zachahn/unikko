@@ -2,12 +2,16 @@ use crate::parser::{Node, Tag};
 use crate::Error;
 use crate::Options;
 
-fn recursively_render(buffer: &mut String, node: Node) -> Result<(), crate::Error> {
+fn recursively_render(
+    buffer: &mut String,
+    options: &Options,
+    node: Node,
+) -> Result<(), crate::Error> {
     match node {
         Node::Element(element) => {
             if element.identifier == Tag::Doc {
                 for child in element.nodes {
-                    recursively_render(buffer, child)?
+                    recursively_render(buffer, options, child)?
                 }
                 return Ok(());
             }
@@ -17,7 +21,7 @@ fn recursively_render(buffer: &mut String, node: Node) -> Result<(), crate::Erro
             };
             buffer.push_str(format!("<{}>", tag).as_str());
             for child in element.nodes {
-                recursively_render(buffer, child)?
+                recursively_render(buffer, options, child)?
             }
             buffer.push_str(format!("</{}>", tag).as_str());
         }
@@ -25,12 +29,17 @@ fn recursively_render(buffer: &mut String, node: Node) -> Result<(), crate::Erro
         Node::NewLine => {
             buffer.push_str("\n");
         }
+        Node::Symbol(symbol) => {
+            if let Some(replacement) = options.symbols.get(&symbol) {
+                buffer.push_str(replacement);
+            }
+        }
     }
     Ok(())
 }
 
-pub fn render(node: Node, _options: &Options) -> Result<String, Error> {
+pub fn render(node: Node, options: &Options) -> Result<String, Error> {
     let mut buffer = String::new();
-    recursively_render(&mut buffer, node)?;
+    recursively_render(&mut buffer, options, node)?;
     Ok(buffer)
 }

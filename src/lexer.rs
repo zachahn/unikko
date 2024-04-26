@@ -1,4 +1,4 @@
-use crate::Options;
+use crate::options::{Options, Symbol};
 use regex::Regex;
 use std::collections::VecDeque;
 use std::io::BufRead;
@@ -33,6 +33,7 @@ pub enum Token {
 
     // Final Phase
     Text(String),
+    Symbol(Symbol),
 }
 
 fn tokenize_lines(input: &mut dyn BufRead) -> Result<VecDeque<Token>, crate::Error> {
@@ -263,14 +264,48 @@ fn tokenize_signatures(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, cr
     Ok(result)
 }
 
-fn tokenize_text(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::Error> {
+fn tokenize_text(
+    mut input: VecDeque<Token>,
+    options: &Options,
+) -> Result<VecDeque<Token>, crate::Error> {
     let mut result = VecDeque::<Token>::new();
 
     loop {
         match input.pop_front() {
             None => break,
             Some(current) => match current {
-                Token::Unparsed(text) => result.push_back(Token::Text(text)),
+                /*
+                if ($this->symbols['apostrophe'] !== false) {
+                    $this->glyph_search[] = '(\w|\))\'(\w)'.$this->regex_snippets['mod'];
+                    $this->glyph_replace[] = '$1'.$this->symbols['apostrophe'].'$2';
+
+                    // Back in '88/the '90s but not in his '90s', '1', '1.' '10m' or '5.png'
+                    $this->glyph_search[] = '/('.$this->regex_snippets['space'].')\''.
+                        '(\d+'.$this->regex_snippets['wrd'].'?)\b(?![.]?['.$this->regex_snippets['wrd'].']*?\')/'.
+                        $this->regex_snippets['mod'];
+                    $this->glyph_replace[] = '$1'.$this->symbols['apostrophe'].'$2';
+                }
+                */
+                Token::Unparsed(text) => {
+                    if options.symbols.contains_key(&Symbol::Apostrophe) {
+                        let regex = Regex::new(r"(\w|\))'(\w)").unwrap();
+                        let mut start: usize = 0;
+                        for found in regex.find_iter(text.as_str()) {
+                            result.push_back(Token::Text(
+                                text[start..(found.start() + 1)].to_string(),
+                            ));
+                            result.push_back(Token::Symbol(Symbol::Apostrophe));
+                            start = found.start() + 2;
+                        }
+                        if start == 0 {
+                            result.push_back(Token::Text(text));
+                        } else {
+                            result.push_back(Token::Text(text[start..text.len()].to_string()));
+                        }
+                    } else {
+                        result.push_back(Token::Text(text))
+                    }
+                }
                 _ => result.push_back(current),
             },
         }
@@ -281,12 +316,12 @@ fn tokenize_text(mut input: VecDeque<Token>) -> Result<VecDeque<Token>, crate::E
 
 pub fn tokenize(
     input: &mut dyn BufRead,
-    _options: &Options,
+    options: &Options,
 ) -> Result<VecDeque<Token>, crate::Error> {
     tokenize_lines(input)
         .and_then(tokenize_blocks)
         .and_then(tokenize_signatures)
-        .and_then(tokenize_text)
+        .and_then(|tokens| tokenize_text(tokens, options))
 }
 
 #[cfg(test)]

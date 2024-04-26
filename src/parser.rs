@@ -1,5 +1,5 @@
 use crate::lexer::{close_block_with_newlines, Token};
-use crate::Options;
+use crate::options::{Options, Symbol};
 use std::collections::VecDeque;
 use std::fmt;
 
@@ -118,6 +118,7 @@ pub enum Node {
 
     Element(Element),
     Plain(Plain),
+    Symbol(Symbol),
 }
 
 #[derive(Debug, PartialEq)]
@@ -274,6 +275,7 @@ fn recursively_parse(
             Token::SignatureEnd => {}
             Token::NewLine => parent.push_node(Node::NewLine),
             Token::Text(text) => parent.push_node(Node::Plain(Plain::new("text", text))),
+            Token::Symbol(sym) => parent.push_node(Node::Symbol(sym)),
             Token::Eof => {
                 if !lexer_tokens.is_empty() {
                     return Err(crate::Error::ParserError);
@@ -312,14 +314,14 @@ mod tests {
 
     #[test]
     fn blocks() -> Result<()> {
-        let mut input = Cursor::new("h1. they're\n\nin the computer");
+        let mut input = Cursor::new("h1. theyre\n\nin the computer");
         let options = Options::default();
         let input = crate::tokenize(&mut input, &options)?;
         let nodes = parse(input, &options)?;
         assert_eq!(
             nodes,
             doc(vec!(
-                h1(A::new(), vec!(text("they're"))),
+                h1(A::new(), vec!(text("theyre"))),
                 Node::NewLine,
                 Node::NewLine,
                 p(A::new(), vec!(text("in the computer"))),
@@ -330,7 +332,7 @@ mod tests {
 
     #[test]
     fn blockquote_implicit_p() -> Result<()> {
-        let mut input = Cursor::new("bq. they're in the computer\n\nthey're in the computer?");
+        let mut input = Cursor::new("bq. theyre in the computer\n\ntheyre in the computer?");
         let options = Options::default();
         let input = crate::tokenize(&mut input, &options)?;
         let nodes = parse(input, &options)?;
@@ -339,11 +341,11 @@ mod tests {
             doc(vec!(
                 bq(
                     A::new(),
-                    vec!(p(A::new(), vec!(text("they're in the computer"))),)
+                    vec!(p(A::new(), vec!(text("theyre in the computer"))),)
                 ),
                 n(),
                 n(),
-                p(A::new(), vec!(text("they're in the computer?")))
+                p(A::new(), vec!(text("theyre in the computer?")))
             ))
         );
         Ok(())
@@ -351,7 +353,9 @@ mod tests {
 
     #[test]
     fn blockquote_extended_explicit_end() -> Result<()> {
-        let mut input = Cursor::new("bq.. they're in the computer\n\nthey're in the computer?\n\np. what do they look like?");
+        let mut input = Cursor::new(
+            "bq.. theyre in the computer\n\ntheyre in the computer?\n\np. what do they look like?",
+        );
         let options = Options::default();
         let input = crate::tokenize(&mut input, &options)?;
         let nodes = parse(input, &options)?;
@@ -361,10 +365,10 @@ mod tests {
                 bq_(
                     A::new(),
                     vec!(
-                        p(A::new(), vec!(text("they're in the computer"))),
+                        p(A::new(), vec!(text("theyre in the computer"))),
                         n(),
                         n(),
-                        p(A::new(), vec!(text("they're in the computer?"))),
+                        p(A::new(), vec!(text("theyre in the computer?"))),
                     )
                 ),
                 n(),
@@ -377,7 +381,7 @@ mod tests {
 
     #[test]
     fn extended_bq_then_bq() -> Result<()> {
-        let mut input = Cursor::new("bq.. they're in the computer\n\nthey're in the computer?\n\nbq.. what do they look like?");
+        let mut input = Cursor::new("bq.. theyre in the computer\n\ntheyre in the computer?\n\nbq.. what do they look like?");
         let options = Options::default();
         let input = crate::tokenize(&mut input, &options)?;
         let nodes = parse(input, &options)?;
@@ -387,10 +391,10 @@ mod tests {
                 bq_(
                     A::new(),
                     vec!(
-                        p(A::new(), vec!(text("they're in the computer"))),
+                        p(A::new(), vec!(text("theyre in the computer"))),
                         n(),
                         n(),
-                        p(A::new(), vec!(text("they're in the computer?"))),
+                        p(A::new(), vec!(text("theyre in the computer?"))),
                     )
                 ),
                 n(),
