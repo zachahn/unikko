@@ -1,4 +1,5 @@
 use crate::options::{Options, Symbol};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::VecDeque;
 use std::io::BufRead;
@@ -288,9 +289,10 @@ fn tokenize_text(
                 */
                 Token::Unparsed(text) => {
                     if options.symbols.contains_key(&Symbol::Apostrophe) {
-                        let regex = Regex::new(r"(\w|\))'(\w)").unwrap();
+                        static CONTRACTIONS: Lazy<Regex> =
+                            Lazy::new(|| Regex::new(r"(\w|\))'(\w)").unwrap());
                         let mut start: usize = 0;
-                        for found in regex.find_iter(text.as_str()) {
+                        for found in CONTRACTIONS.find_iter(text.as_str()) {
                             result.push_back(Token::Text(
                                 text[start..(found.start() + 1)].to_string(),
                             ));

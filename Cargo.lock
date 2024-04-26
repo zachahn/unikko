@@ -592,6 +592,7 @@ dependencies = [
  "anyhow",
  "lazy_static",
  "lol_html",
+ "once_cell",
  "regex",
  "serde",
  "serde_yaml",
