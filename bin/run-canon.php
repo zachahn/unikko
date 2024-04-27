@@ -2,6 +2,14 @@
 <?php
 require __DIR__ . "/../canon/src/Netcarver/Textile/Parser.php";
 
+$long_options = array(
+    "toggle-line-wrap",
+);
+
+$rest_index = null;
+$options = getopt("", $long_options, $rest_index);
+array_splice($argv, 1, $rest_index - 1);
+
 if (count($argv) != 2 || $argv[1] == "help" || $argv[1] == "--help" || $argv[1] == "-h") {
     echo "{$argv[0]} expects one argument:\n";
     $indentation = str_repeat(" ", strlen($argv[0]));
@@ -20,8 +28,15 @@ if ($argv[1] == "-") {
 }
 
 $parser = new \Netcarver\Textile\Parser();
+
+if (isset($options["toggle-line-wrap"]) && $options["toggle-line-wrap"]) {
+    $parser->setLineWrap(false);
+}
+
 $output = $parser->parse($input) . "\n";
 
+var_dump($options);
+echo str_repeat("-", 60) . "\n";
 var_dump($input);
 echo str_repeat("-", 60) . "\n";
 echo $output;
