@@ -4,6 +4,7 @@ mod convenience;
 mod error;
 mod lexer;
 mod options;
+mod parcom;
 mod parser;
 mod renderer;
 
