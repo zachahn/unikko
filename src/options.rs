@@ -3,6 +3,7 @@ use std::collections::HashMap;
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum Symbol {
     Apostrophe,
+    Trademark,
 }
 
 enum Doctype {
@@ -70,7 +71,7 @@ impl Options {
             // ("emdash", "&#8212;"),
             // ("endash", "&#8211;"),
             // ("dimension", "&#215;"),
-            // ("trademark", "&#8482;"),
+            (Symbol::Trademark, "&#8482;"),
             // ("registered", "&#174;"),
             // ("copyright", "&#169;"),
             // ("half", "&#189;"),

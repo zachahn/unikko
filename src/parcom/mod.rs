@@ -8,9 +8,9 @@ use crate::Error::ParComError;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take, take_until, take_while1};
 use nom::character::complete::char;
-use nom::combinator::all_consuming;
-use nom::combinator::fail;
+use nom::combinator::{all_consuming, fail};
 use nom::multi::{many0, many1};
+use nom::sequence::delimited;
 use nom::IResult;
 
 #[allow(dead_code)]
@@ -105,12 +105,30 @@ fn link(i: &str) -> IResult<&str, Node> {
 
 fn apostrophe(i: &str) -> IResult<&str, Node> {
     let (i, _) = char('\'')(i)?;
-
     Ok((i, Node::Symbol(Symbol::Apostrophe)))
 }
 
+fn tm(i: &str) -> IResult<&str, Node> {
+    let tms = (tag("tm"), tag("TM"), tag("tM"), tag("Tm"));
+    let (i, _) = alt(tms)(i)?;
+    Ok((i, Node::Symbol(Symbol::Trademark)))
+}
+
+fn simple_symbols(i: &str) -> IResult<&str, Node> {
+    delimited(char('('), tm, char(')'))(i)
+}
+
 fn inline(i: &str) -> IResult<&str, Vec<Node>> {
-    let alts = (bold, strong, plain, apostrophe, link, newline, catchall1);
+    let alts = (
+        bold,
+        strong,
+        plain,
+        apostrophe,
+        simple_symbols,
+        link,
+        newline,
+        catchall1,
+    );
     many1(alt(alts))(i)
 }
 
