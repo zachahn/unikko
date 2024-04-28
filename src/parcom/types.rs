@@ -14,6 +14,8 @@ pub enum Tag {
     Bq,
     Strong,
     B,
+    Em,
+    I,
     A,
     Other(String),
 }

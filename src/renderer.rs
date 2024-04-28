@@ -15,6 +15,8 @@ fn tag_name(tag: &Tag) -> &str {
         Tag::A => "a",
         Tag::B => "b",
         Tag::Strong => "strong",
+        Tag::I => "i",
+        Tag::Em => "em",
         Tag::Other(_) => unimplemented!(),
         Tag::Doc => unimplemented!(),
     }

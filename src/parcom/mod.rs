@@ -61,7 +61,7 @@ fn bold(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag("**")(i)?;
     let (i, inside) = take_until("*")(i)?;
     let (i, _) = tag("**")(i)?;
-    let (_, nodes) = inline(inside)?;
+    let (_, nodes) = all_consuming(inline)(inside)?;
     let mut element = Element::empty(Tag::B);
     element.nodes = nodes;
     Ok((i, Node::Element(element)))
@@ -71,9 +71,29 @@ fn strong(i: &str) -> IResult<&str, Node> {
     let (i, _) = char('*')(i)?;
     let (i, inside) = take_until("*")(i)?;
     let (i, _) = char('*')(i)?;
-    let (_, node) = plain(inside)?;
+    let (_, nodes) = all_consuming(inline)(inside)?;
     let mut element = Element::empty(Tag::Strong);
-    element.nodes.push(node);
+    element.nodes = nodes;
+    Ok((i, Node::Element(element)))
+}
+
+fn italic(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("__")(i)?;
+    let (i, inside) = take_until("__")(i)?;
+    let (i, _) = tag("__")(i)?;
+    let (_, nodes) = all_consuming(inline)(inside)?;
+    let mut element = Element::empty(Tag::I);
+    element.nodes = nodes;
+    Ok((i, Node::Element(element)))
+}
+
+fn emphasized(i: &str) -> IResult<&str, Node> {
+    let (i, _) = char('_')(i)?;
+    let (i, inside) = take_until("_")(i)?;
+    let (i, _) = char('_')(i)?;
+    let (_, nodes) = all_consuming(inline)(inside)?;
+    let mut element = Element::empty(Tag::Em);
+    element.nodes = nodes;
     Ok((i, Node::Element(element)))
 }
 
@@ -108,20 +128,72 @@ fn apostrophe(i: &str) -> IResult<&str, Node> {
     Ok((i, Node::Symbol(Symbol::Apostrophe)))
 }
 
-fn tm(i: &str) -> IResult<&str, Node> {
-    let tms = (tag("tm"), tag("TM"), tag("tM"), tag("Tm"));
-    let (i, _) = alt(tms)(i)?;
+fn trademark(i: &str) -> IResult<&str, Node> {
+    let patterns = (tag("tm"), tag("TM"), tag("tM"), tag("Tm"));
+    let (i, _) = alt(patterns)(i)?;
     Ok((i, Node::Symbol(Symbol::Trademark)))
 }
 
+fn registered(i: &str) -> IResult<&str, Node> {
+    let patterns = (tag("r"), tag("R"));
+    let (i, _) = alt(patterns)(i)?;
+    Ok((i, Node::Symbol(Symbol::Registered)))
+}
+
+fn copyright(i: &str) -> IResult<&str, Node> {
+    let patterns = (tag("c"), tag("C"));
+    let (i, _) = alt(patterns)(i)?;
+    Ok((i, Node::Symbol(Symbol::Copyright)))
+}
+
+fn half(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("1/2")(i)?;
+    Ok((i, Node::Symbol(Symbol::Half)))
+}
+
+fn quarter(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("1/4")(i)?;
+    Ok((i, Node::Symbol(Symbol::Quarter)))
+}
+
+fn three_quarters(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("3/4")(i)?;
+    Ok((i, Node::Symbol(Symbol::ThreeQuarters)))
+}
+
+fn degrees(i: &str) -> IResult<&str, Node> {
+    let patterns = (tag("o"), tag("O"));
+    let (i, _) = alt(patterns)(i)?;
+    Ok((i, Node::Symbol(Symbol::Degrees)))
+}
+
+fn plus_minus(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("+/-")(i)?;
+    Ok((i, Node::Symbol(Symbol::PlusMinus)))
+}
+
 fn simple_symbols(i: &str) -> IResult<&str, Node> {
-    delimited(char('('), tm, char(')'))(i)
+    let symbols = (
+        trademark,
+        registered,
+        copyright,
+        half,
+        quarter,
+        three_quarters,
+        degrees,
+        plus_minus,
+    );
+    let with_parens = delimited(char('('), alt(symbols), char(')'));
+    let with_squares = delimited(char('['), alt(symbols), char(']'));
+    alt((with_parens, with_squares))(i)
 }
 
 fn inline(i: &str) -> IResult<&str, Vec<Node>> {
     let alts = (
         bold,
         strong,
+        italic,
+        emphasized,
         plain,
         apostrophe,
         simple_symbols,
