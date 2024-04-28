@@ -8,7 +8,7 @@ pub fn textile_to_html_with_options<'a>(
     options: Options,
 ) -> Result<String, Error> {
     let tree = parcom(textile.as_ref())?;
-    render(tree, &options)
+    render(&tree, &options)
 }
 
 pub fn textile_to_html<'a>(textile: impl AsRef<str>) -> Result<String, Error> {
