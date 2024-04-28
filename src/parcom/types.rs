@@ -89,11 +89,22 @@ impl Plain {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub enum Node {
     NewLine,
 
     Element(Element),
     Plain(Plain),
     Symbol(Symbol),
+}
+
+impl fmt::Debug for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Node::NewLine => f.debug_struct("NewLine").finish(),
+            Node::Element(element) => write!(f, "{:?}", element),
+            Node::Plain(plain) => write!(f, "{:?}", plain),
+            Node::Symbol(symbol) => write!(f, "{:?}", symbol),
+        }
+    }
 }
