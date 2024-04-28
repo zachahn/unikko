@@ -1,9 +1,9 @@
 use crate::options::Symbol;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum Tag {
     Doc,
-    None,
     P,
     H1,
     H2,
@@ -18,11 +18,31 @@ pub enum Tag {
     Other(String),
 }
 
+impl fmt::Display for Tag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let txt = match self {
+            Tag::Doc => "doc",
+            Tag::P => "p",
+            Tag::H1 => "h1",
+            Tag::H2 => "h2",
+            Tag::H3 => "h3",
+            Tag::H4 => "h4",
+            Tag::H5 => "h5",
+            Tag::H6 => "h6",
+            Tag::Bq => "bq",
+            Tag::A => "a",
+            Tag::B => "b",
+            Tag::Strong => "strong",
+            Tag::Other(desc) => desc,
+        };
+        write!(f, "{}", txt)
+    }
+}
+
 impl From<&str> for Tag {
     fn from(tag_string: &str) -> Self {
         match tag_string {
             "doc" => Tag::Doc,
-            "none" => Tag::None,
             "p" => Tag::P,
             "h1" => Tag::H1,
             "h2" => Tag::H2,

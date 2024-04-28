@@ -1,4 +1,4 @@
-use crate::parser::{Node, Tag};
+use crate::parcom::{Node, Tag};
 use crate::Error;
 use crate::Options;
 
@@ -9,13 +9,13 @@ fn recursively_render(
 ) -> Result<(), crate::Error> {
     match node {
         Node::Element(element) => {
-            if element.identifier == Tag::Doc {
+            if element.tag == Tag::Doc {
                 for child in element.nodes {
                     recursively_render(buffer, options, child)?
                 }
                 return Ok(());
             }
-            let tag = match element.identifier {
+            let tag = match element.tag {
                 Tag::Bq => "blockquote".to_string(),
                 other => other.to_string(),
             };

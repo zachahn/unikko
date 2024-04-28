@@ -6,4 +6,6 @@ pub enum Error {
     LexerError,
     #[error("the parser broke")]
     ParserError,
+    #[error("parcom error: {msg}")]
+    ParComError { msg: &'static str },
 }

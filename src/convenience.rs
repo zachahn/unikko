@@ -1,22 +1,29 @@
-use crate::lexer::tokenize;
-use crate::parser::parse;
+use crate::parcom::parcom;
 use crate::renderer::render;
 use crate::Error;
 use crate::Options;
-use std::io::Cursor;
 
-pub fn textile_to_html_with_options(
-    textile: impl Into<String>,
+pub fn textile_to_html_with_options<'a>(
+    textile: impl AsRef<str>,
     options: Options,
 ) -> Result<String, Error> {
-    let mut input = Cursor::new(textile.into());
-    let tokens = tokenize(&mut input, &options)?;
-    let tree = parse(tokens, &options)?;
+    let tree = parcom(textile.as_ref())?;
     render(tree, &options)
 }
 
-pub fn textile_to_html(textile: impl Into<String>) -> Result<String, Error> {
+pub fn textile_to_html<'a>(textile: impl AsRef<str>) -> Result<String, Error> {
     textile_to_html_with_options(textile, Options::default())
+}
+
+pub fn textile_to_tree_with_options<'a>(
+    textile: impl AsRef<str>,
+    options: Options,
+) -> Result<crate::parcom::Node, Error> {
+    parcom(textile.as_ref())
+}
+
+pub fn textile_to_tree<'a>(textile: impl AsRef<str>) -> Result<crate::parcom::Node, Error> {
+    textile_to_tree_with_options(textile, Options::default())
 }
 
 #[cfg(test)]

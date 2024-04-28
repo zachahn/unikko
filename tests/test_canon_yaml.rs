@@ -42,16 +42,19 @@ fn textile_to_html() -> Result<()> {
         for case_name in test_case_names {
             count_all += 1;
             let test_case = test_cases.get(case_name.as_str()).unwrap();
-            let input_clone = test_case.input.clone();
             let actual = unikko::textile_to_html(test_case.input.clone())?;
             if normalized(actual.as_str()) == normalized(test_case.expect.as_str()) {
                 count_all_pass += 1;
             } else {
                 if !printed {
                     println!("➡️   FAILURE:\n- set: {}\n- case: {}\n", set_name, case_name);
-                    println!("➡️   INPUT:\n{}\n\n", input_clone);
+                    println!("➡️   INPUT:\n{}\n\n", test_case.input);
                     println!("➡️   EXPECTED:\n{}\n\n", test_case.expect);
                     println!("➡️   ACTUAL:\n{}\n", actual);
+                    println!(
+                        "➡️   NODES:\n{:?}",
+                        unikko::textile_to_tree(test_case.input.clone())
+                    );
                     printed = true;
                 }
             }
