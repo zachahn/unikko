@@ -8,4 +8,6 @@ pub enum Error {
     ParserError,
     #[error("parcom error: {msg}")]
     ParComError { msg: &'static str },
+    #[error("into tag error")]
+    IntoTagError,
 }

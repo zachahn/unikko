@@ -1,4 +1,5 @@
 use crate::options::Symbol;
+use crate::Error;
 use std::fmt;
 
 #[derive(Debug, PartialEq)]
@@ -25,23 +26,19 @@ pub enum Tag {
     Other(String),
 }
 
-impl From<&str> for Tag {
-    fn from(tag_string: &str) -> Self {
+impl TryFrom<&str> for Tag {
+    type Error = Error;
+
+    fn try_from(tag_string: &str) -> Result<Self, Error> {
         match tag_string {
-            "doc" => Tag::Doc,
-            "p" => Tag::Paragraph,
-            "h1" => Tag::H1,
-            "h2" => Tag::H2,
-            "h3" => Tag::H3,
-            "h4" => Tag::H4,
-            "h5" => Tag::H5,
-            "h6" => Tag::H6,
-            "bq" => Tag::Blockquote,
-            "a" => Tag::Anchor,
-            "b" => Tag::Bold,
-            "strong" => Tag::Strong,
-            "%" => Tag::Span,
-            _ => Tag::Other(tag_string.to_string()),
+            "p" => Ok(Tag::Paragraph),
+            "h1" => Ok(Tag::H1),
+            "h2" => Ok(Tag::H2),
+            "h3" => Ok(Tag::H3),
+            "h4" => Ok(Tag::H4),
+            "h5" => Ok(Tag::H5),
+            "h6" => Ok(Tag::H6),
+            _ => Err(Error::IntoTagError),
         }
     }
 }
@@ -61,6 +58,30 @@ impl Attributes {
             classes: Vec::new(),
         }
     }
+
+    pub fn href(href: String) -> Self {
+        Self {
+            href: Some(href),
+            id: None,
+            classes: Vec::new(),
+        }
+    }
+
+    pub fn classes(classes: Vec<String>) -> Self {
+        Self {
+            href: None,
+            id: None,
+            classes: classes,
+        }
+    }
+
+    pub fn classes_id(classes: Vec<String>, id: String) -> Self {
+        Self {
+            href: None,
+            id: Some(id),
+            classes: classes,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -71,20 +92,36 @@ pub struct Element {
 }
 
 impl Element {
-    pub fn init(tag: Tag, attrs: Attributes, nodes: Vec<Node>) -> Self {
+    pub fn new(tag: Tag) -> Self {
+        Self {
+            tag: tag,
+            attrs: Attributes::new(),
+            nodes: vec![],
+        }
+    }
+
+    pub fn attrs(tag: Tag, attrs: Attributes) -> Self {
+        Self {
+            tag: tag,
+            attrs: attrs,
+            nodes: vec![],
+        }
+    }
+
+    pub fn nodes(tag: Tag, nodes: Vec<Node>) -> Self {
+        Self {
+            tag: tag,
+            attrs: Attributes::new(),
+            nodes: nodes,
+        }
+    }
+
+    pub fn attrs_nodes(tag: Tag, attrs: Attributes, nodes: Vec<Node>) -> Self {
         Self {
             tag: tag,
             attrs: attrs,
             nodes: nodes,
         }
-    }
-
-    pub fn new(tag: impl Into<Tag>) -> Self {
-        Self::init(tag.into(), Attributes::new(), vec![])
-    }
-
-    pub fn empty(tag: Tag) -> Self {
-        Self::init(tag, Attributes::new(), vec![])
     }
 }
 

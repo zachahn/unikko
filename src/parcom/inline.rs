@@ -14,9 +14,11 @@ fn caps(i: &str) -> IResult<&str, Node> {
     if matched.len() <= 2 {
         return fail(i);
     }
-    let mut element = Element::new(Tag::Span);
-    element.attrs.classes.push("caps".into());
-    element.nodes.push(Node::Plain(Plain::new(matched)));
+    let element = Element::attrs_nodes(
+        Tag::Span,
+        Attributes::classes(vec!["caps".into()]),
+        vec![Node::Plain(Plain::new(matched))],
+    );
     Ok((i, Node::Element(element)))
 }
 
@@ -49,8 +51,7 @@ fn bold(i: &str) -> IResult<&str, Node> {
     let (i, inside) = take_until("*")(i)?;
     let (i, _) = tag("**")(i)?;
     let (_, nodes) = handle_inline(inside)?;
-    let mut element = Element::empty(Tag::Bold);
-    element.nodes = nodes;
+    let element = Element::nodes(Tag::Bold, nodes);
     Ok((i, Node::Element(element)))
 }
 
@@ -59,8 +60,7 @@ fn strong(i: &str) -> IResult<&str, Node> {
     let (i, inside) = take_until("*")(i)?;
     let (i, _) = char('*')(i)?;
     let (_, nodes) = handle_inline(inside)?;
-    let mut element = Element::empty(Tag::Strong);
-    element.nodes = nodes;
+    let element = Element::nodes(Tag::Strong, nodes);
     Ok((i, Node::Element(element)))
 }
 
@@ -69,8 +69,7 @@ fn italic(i: &str) -> IResult<&str, Node> {
     let (i, inside) = take_until("__")(i)?;
     let (i, _) = tag("__")(i)?;
     let (_, nodes) = all_consuming(handle_inline)(inside)?;
-    let mut element = Element::empty(Tag::Italic);
-    element.nodes = nodes;
+    let element = Element::nodes(Tag::Italic, nodes);
     Ok((i, Node::Element(element)))
 }
 
@@ -79,8 +78,7 @@ fn emphasized(i: &str) -> IResult<&str, Node> {
     let (i, inside) = take_until("_")(i)?;
     let (i, _) = char('_')(i)?;
     let (_, nodes) = all_consuming(handle_inline)(inside)?;
-    let mut element = Element::empty(Tag::Emphasis);
-    element.nodes = nodes;
+    let element = Element::nodes(Tag::Emphasis, nodes);
     Ok((i, Node::Element(element)))
 }
 
@@ -181,18 +179,12 @@ fn footnote_ref_link(i: &str) -> IResult<&str, Node> {
         take_while1(|chr: char| chr.is_ascii_digit()),
         tag("]"),
     )(i)?;
-    let text = Node::Plain(Plain::new(matched));
-    let mut attrs = Attributes::new();
-    attrs.classes.push("footnote".to_owned());
-    attrs.id = Some("fnrev".to_owned());
-    Ok((
-        i,
-        Node::Element(Element::init(
-            Tag::FootnoteRefLink,
-            attrs,
-            vec![text],
-        )),
-    ))
+    let element = Element::attrs_nodes(
+        Tag::FootnoteRefLink,
+        Attributes::classes_id(vec!["footnote".into()], "fnrev".into()),
+        vec![Node::Plain(Plain::new(matched))],
+    );
+    Ok((i, Node::Element(element)))
 }
 
 fn footnote_ref_plain(i: &str) -> IResult<&str, Node> {
@@ -201,18 +193,12 @@ fn footnote_ref_plain(i: &str) -> IResult<&str, Node> {
         take_while1(|chr: char| chr.is_ascii_digit()),
         tag("!]"),
     )(i)?;
-    let text = Node::Plain(Plain::new(matched));
-    let mut attrs = Attributes::new();
-    attrs.classes.push("footnote".to_owned());
-    attrs.id = Some("fnrev".to_owned());
-    Ok((
-        i,
-        Node::Element(Element::init(
-            Tag::FootnoteRefPlain,
-            attrs,
-            vec![text],
-        )),
-    ))
+    let element = Element::attrs_nodes(
+        Tag::FootnoteRefPlain,
+        Attributes::classes_id(vec!["footnote".into()], "fnrev".into()),
+        vec![Node::Plain(Plain::new(matched))],
+    );
+    Ok((i, Node::Element(element)))
 }
 
 fn footnote_ref(i: &str) -> IResult<&str, Node> {

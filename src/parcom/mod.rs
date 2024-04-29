@@ -55,10 +55,7 @@ fn explicit_block(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, nodes) = handle_inline(matched_content)?;
-
-    let mut el = Element::new(matched_tag);
-    el.nodes = nodes;
-
+    let el = Element::nodes(Tag::try_from(matched_tag).unwrap(), nodes);
     Ok((i, Node::Element(el)))
 }
 
@@ -67,10 +64,8 @@ fn blockquote(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, nodes) = handle_inline(matched_content)?;
-    let mut bq = Element::new(Tag::Blockquote);
-    let mut p = Element::new(Tag::Paragraph);
-    p.nodes = nodes;
-    bq.nodes = vec![Node::Element(p)];
+    let p = Element::nodes(Tag::Paragraph, nodes);
+    let bq = Element::nodes(Tag::Blockquote, vec![Node::Element(p)]);
     Ok((i, Node::Element(bq)))
 }
 
@@ -78,8 +73,7 @@ fn implicit_block(i: &str) -> IResult<&str, Node> {
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, nodes) = handle_inline(matched_content)?;
 
-    let mut el = Element::new(Tag::Paragraph);
-    el.nodes = nodes;
+    let el = Element::nodes(Tag::Paragraph, nodes);
     Ok((i, Node::Element(el)))
 }
 
@@ -89,9 +83,10 @@ fn footnote_plain(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, mut nodes) = handle_inline(matched_content)?;
-    let mut el = Element::new(Tag::Footnote);
-    el.attrs.classes.push("footnote".to_string());
-    el.attrs.id = Some("fn".to_string());
+    let mut el = Element::attrs(
+        Tag::Footnote,
+        Attributes::classes_id(vec!["footnote".into()], "fn".into()),
+    );
     el.nodes.append(&mut nodes);
     Ok((i, Node::Element(el)))
 }
@@ -102,24 +97,19 @@ fn footnote_link(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag("^. ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, mut nodes) = handle_inline(matched_content)?;
-    let mut link_up_attrs = Attributes::new();
-    link_up_attrs.href = Some("#fnrev".to_owned());
-    let link_up = Element::init(
+    let link_up = Element::attrs_nodes(
         Tag::Anchor,
-        link_up_attrs,
+        Attributes::href("#fnrev".into()),
         vec![Node::Plain(Plain::new(matched))],
     );
-    let superscript = Element::init(
+    let superscript = Element::attrs_nodes(
         Tag::FootnoteId,
         Attributes::new(),
         vec![Node::Element(link_up)],
     );
-    let mut attrs = Attributes::new();
-    attrs.classes.push("footnote".to_string());
-    attrs.id = Some("fn".to_string());
-    let mut el = Element::init(
+    let mut el = Element::attrs_nodes(
         Tag::Footnote,
-        attrs,
+        Attributes::classes_id(vec!["footnote".into()], "fn".into()),
         vec![Node::Element(superscript), Node::Plain(Plain::new(" "))],
     );
     el.nodes.append(&mut nodes);
@@ -157,8 +147,7 @@ pub fn parcom(i: &str) -> Result<Node, Error> {
                 });
             }
 
-            let mut doc = Element::empty(Tag::Doc);
-            doc.nodes = nodes;
+            let doc = Element::nodes(Tag::Doc, nodes);
             return Ok(Node::Element(doc));
         }
     }
