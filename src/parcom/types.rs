@@ -147,6 +147,24 @@ pub enum Node {
     Symbol(Symbol),
 }
 
+impl From<Element> for Node {
+    fn from(element: Element) -> Self {
+        Node::Element(element)
+    }
+}
+
+impl From<Plain> for Node {
+    fn from(plain: Plain) -> Self {
+        Node::Plain(plain)
+    }
+}
+
+impl From<Symbol> for Node {
+    fn from(symbol: Symbol) -> Self {
+        Node::Symbol(symbol)
+    }
+}
+
 impl fmt::Debug for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
