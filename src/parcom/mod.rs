@@ -1,264 +1,22 @@
+mod inline;
 mod types;
+mod utils;
 
-use crate::options::Symbol;
+use crate::parcom::inline::handle_inline;
 pub use crate::parcom::types::*;
 use crate::Error;
 use crate::Error::ParComError;
 
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take, take_until, take_while1};
+use nom::bytes::complete::{tag, take_while1};
 use nom::character::complete::char;
-use nom::combinator::{all_consuming, fail};
-use nom::multi::{many0, many1};
-use nom::sequence::delimited;
+use nom::combinator::fail;
+use nom::multi::many0;
 use nom::IResult;
-
-#[allow(dead_code)]
-fn dbg_dmp_s<'a, F, O, E: std::fmt::Debug>(
-    mut f: F,
-    context: &'static str,
-) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
-where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
-{
-    use nom::HexDisplay;
-    move |i: &'a str| match f(i) {
-        Err(e) => {
-            println!("{}: Error({:?}) at:\n{}", context, e, i.to_hex(8));
-            Err(e)
-        }
-        a => a,
-    }
-}
-
-fn catchall1(i: &str) -> IResult<&str, Node> {
-    let (i, matched) = take(1usize)(i)?;
-    Ok((i, Node::Plain(Plain::new(matched))))
-}
 
 fn newline(i: &str) -> IResult<&str, Node> {
     let (i, _) = char('\n')(i)?;
     Ok((i, Node::NewLine))
-}
-
-fn bold(i: &str) -> IResult<&str, Node> {
-    let (i, _) = tag("**")(i)?;
-    let (i, inside) = take_until("*")(i)?;
-    let (i, _) = tag("**")(i)?;
-    let (_, nodes) = all_consuming(inline)(inside)?;
-    let mut element = Element::empty(Tag::Bold);
-    element.nodes = nodes;
-    Ok((i, Node::Element(element)))
-}
-
-fn strong(i: &str) -> IResult<&str, Node> {
-    let (i, _) = char('*')(i)?;
-    let (i, inside) = take_until("*")(i)?;
-    let (i, _) = char('*')(i)?;
-    let (_, nodes) = all_consuming(inline)(inside)?;
-    let mut element = Element::empty(Tag::Strong);
-    element.nodes = nodes;
-    Ok((i, Node::Element(element)))
-}
-
-fn italic(i: &str) -> IResult<&str, Node> {
-    let (i, _) = tag("__")(i)?;
-    let (i, inside) = take_until("__")(i)?;
-    let (i, _) = tag("__")(i)?;
-    let (_, nodes) = all_consuming(inline)(inside)?;
-    let mut element = Element::empty(Tag::Italic);
-    element.nodes = nodes;
-    Ok((i, Node::Element(element)))
-}
-
-fn emphasized(i: &str) -> IResult<&str, Node> {
-    let (i, _) = char('_')(i)?;
-    let (i, inside) = take_until("_")(i)?;
-    let (i, _) = char('_')(i)?;
-    let (_, nodes) = all_consuming(inline)(inside)?;
-    let mut element = Element::empty(Tag::Emphasis);
-    element.nodes = nodes;
-    Ok((i, Node::Element(element)))
-}
-
-fn is_url(chr: char) -> bool {
-    match chr {
-        'a'..='z' => true,
-        'A'..='Z' => true,
-        '0'..='9' => true,
-        ':' => true,
-        '/' => true,
-        '.' => true,
-        '?' | '&' => true,
-        '%' => true,
-        _ => false,
-    }
-}
-
-fn link(i: &str) -> IResult<&str, Node> {
-    let (i, _) = char('"')(i)?;
-    let (i, display) = take_until("\"")(i)?;
-    let (i, _) = tag("\":")(i)?;
-    let (i, url) = take_while1(is_url)(i)?;
-    let mut el = Element::new(Tag::Anchor, false);
-    el.nodes = vec![Node::Plain(Plain::new(display))];
-    el.attrs.href = Some(url.to_string());
-
-    Ok((i, Node::Element(el)))
-}
-
-fn apostrophe(i: &str) -> IResult<&str, Node> {
-    let (i, _) = char('\'')(i)?;
-    Ok((i, Node::Symbol(Symbol::Apostrophe)))
-}
-
-fn trademark(i: &str) -> IResult<&str, Node> {
-    let patterns = (tag("tm"), tag("TM"), tag("tM"), tag("Tm"));
-    let (i, _) = alt(patterns)(i)?;
-    Ok((i, Node::Symbol(Symbol::Trademark)))
-}
-
-fn registered(i: &str) -> IResult<&str, Node> {
-    let patterns = (tag("r"), tag("R"));
-    let (i, _) = alt(patterns)(i)?;
-    Ok((i, Node::Symbol(Symbol::Registered)))
-}
-
-fn copyright(i: &str) -> IResult<&str, Node> {
-    let patterns = (tag("c"), tag("C"));
-    let (i, _) = alt(patterns)(i)?;
-    Ok((i, Node::Symbol(Symbol::Copyright)))
-}
-
-fn half(i: &str) -> IResult<&str, Node> {
-    let (i, _) = tag("1/2")(i)?;
-    Ok((i, Node::Symbol(Symbol::Half)))
-}
-
-fn quarter(i: &str) -> IResult<&str, Node> {
-    let (i, _) = tag("1/4")(i)?;
-    Ok((i, Node::Symbol(Symbol::Quarter)))
-}
-
-fn three_quarters(i: &str) -> IResult<&str, Node> {
-    let (i, _) = tag("3/4")(i)?;
-    Ok((i, Node::Symbol(Symbol::ThreeQuarters)))
-}
-
-fn degrees(i: &str) -> IResult<&str, Node> {
-    let patterns = (tag("o"), tag("O"));
-    let (i, _) = alt(patterns)(i)?;
-    Ok((i, Node::Symbol(Symbol::Degrees)))
-}
-
-fn plus_minus(i: &str) -> IResult<&str, Node> {
-    let (i, _) = tag("+/-")(i)?;
-    Ok((i, Node::Symbol(Symbol::PlusMinus)))
-}
-
-fn simple_symbols(i: &str) -> IResult<&str, Node> {
-    let symbols = (
-        trademark,
-        registered,
-        copyright,
-        half,
-        quarter,
-        three_quarters,
-        degrees,
-        plus_minus,
-    );
-    let with_parens = delimited(char('('), alt(symbols), char(')'));
-    let with_squares = delimited(char('['), alt(symbols), char(']'));
-    alt((with_parens, with_squares))(i)
-}
-
-fn caps(i: &str) -> IResult<&str, Node> {
-    let (i, matched) = take_while1(|chr: char| chr.is_uppercase())(i)?;
-    if matched.len() <= 2 {
-        return fail(i);
-    }
-    let mut element = Element::new(Tag::Span, false);
-    element.attrs.classes.push("caps".into());
-    element.nodes.push(Node::Plain(Plain::new(matched)));
-    Ok((i, Node::Element(element)))
-}
-
-fn plain(i: &str) -> IResult<&str, Node> {
-    let (i, matched) = take_while1(|chr: char| chr.is_alphabetic())(i)?;
-    Ok((i, Node::Plain(Plain::new(matched))))
-}
-
-fn word(i: &str) -> IResult<&str, Node> {
-    alt((caps, plain))(i)
-}
-
-fn whitespace(i: &str) -> IResult<&str, Node> {
-    let (i, matched) = take_while1(|chr: char| chr == ' ')(i)?;
-    Ok((i, Node::Plain(Plain::new(matched))))
-}
-
-fn footnote_ref_link(i: &str) -> IResult<&str, Node> {
-    let (i, matched) = delimited(
-        char('['),
-        take_while1(|chr: char| chr.is_ascii_digit()),
-        tag("]"),
-    )(i)?;
-    let text = Node::Plain(Plain::new(matched));
-    let mut attrs = Attributes::new();
-    attrs.classes.push("footnote".to_owned());
-    attrs.id = Some("fnrev".to_owned());
-    Ok((
-        i,
-        Node::Element(Element::init(
-            Tag::FootnoteRefLink,
-            attrs,
-            vec![text],
-            false,
-        )),
-    ))
-}
-
-fn footnote_ref_plain(i: &str) -> IResult<&str, Node> {
-    let (i, matched) = delimited(
-        char('['),
-        take_while1(|chr: char| chr.is_ascii_digit()),
-        tag("!]"),
-    )(i)?;
-    let text = Node::Plain(Plain::new(matched));
-    let mut attrs = Attributes::new();
-    attrs.classes.push("footnote".to_owned());
-    attrs.id = Some("fnrev".to_owned());
-    Ok((
-        i,
-        Node::Element(Element::init(
-            Tag::FootnoteRefPlain,
-            attrs,
-            vec![text],
-            false,
-        )),
-    ))
-}
-
-fn footnote_ref(i: &str) -> IResult<&str, Node> {
-    alt((footnote_ref_link, footnote_ref_plain))(i)
-}
-
-fn inline(i: &str) -> IResult<&str, Vec<Node>> {
-    let alts = (
-        word,
-        bold,
-        strong,
-        italic,
-        emphasized,
-        whitespace,
-        footnote_ref,
-        apostrophe,
-        simple_symbols,
-        link,
-        newline,
-        catchall1,
-    );
-    all_consuming(many1(alt(alts)))(i)
 }
 
 fn take_until_block_ending(i: &str) -> IResult<&str, &str> {
@@ -296,7 +54,7 @@ fn explicit_block(i: &str) -> IResult<&str, Node> {
     let (i, matched_tag) = alt(acceptable_tags)(i)?;
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
-    let (_, nodes) = inline(matched_content)?;
+    let (_, nodes) = handle_inline(matched_content)?;
 
     let mut el = Element::new(matched_tag, false);
     el.nodes = nodes;
@@ -308,7 +66,7 @@ fn blockquote(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag("bq")(i)?;
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
-    let (_, nodes) = inline(matched_content)?;
+    let (_, nodes) = handle_inline(matched_content)?;
     let mut bq = Element::new(Tag::Blockquote, false);
     let mut p = Element::new(Tag::Paragraph, false);
     p.nodes = nodes;
@@ -318,7 +76,7 @@ fn blockquote(i: &str) -> IResult<&str, Node> {
 
 fn implicit_block(i: &str) -> IResult<&str, Node> {
     let (i, matched_content) = take_until_block_ending(i)?;
-    let (_, nodes) = inline(matched_content)?;
+    let (_, nodes) = handle_inline(matched_content)?;
 
     let mut el = Element::new(Tag::Paragraph, false);
     el.nodes = nodes;
@@ -330,7 +88,7 @@ fn footnote_plain(i: &str) -> IResult<&str, Node> {
     let (i, matched) = take_while1(|chr: char| chr.is_ascii_digit())(i)?;
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
-    let (_, mut nodes) = inline(matched_content)?;
+    let (_, mut nodes) = handle_inline(matched_content)?;
     let mut el = Element::new(Tag::Footnote, false);
     el.attrs.classes.push("footnote".to_string());
     el.attrs.id = Some("fn".to_string());
@@ -343,7 +101,7 @@ fn footnote_link(i: &str) -> IResult<&str, Node> {
     let (i, matched) = take_while1(|chr: char| chr.is_ascii_digit())(i)?;
     let (i, _) = tag("^. ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
-    let (_, mut nodes) = inline(matched_content)?;
+    let (_, mut nodes) = handle_inline(matched_content)?;
     let mut link_up_attrs = Attributes::new();
     link_up_attrs.href = Some("#fnrev".to_owned());
     let link_up = Element::init(
@@ -415,24 +173,6 @@ mod tests {
     use anyhow::Result;
 
     #[test]
-    fn inline1() -> Result<()> {
-        let input = "they're in the computer";
-        let (remaining, node) = inline(input)?;
-        println!("🔎 {:?}", node);
-        assert_eq!(remaining, "");
-        Ok(())
-    }
-
-    #[test]
-    fn inline2() -> Result<()> {
-        let input = "*hi* **hello** *hi*";
-        let (remaining, node) = inline(input)?;
-        println!("🔎 {:?}", node);
-        assert_eq!(remaining, "");
-        Ok(())
-    }
-
-    #[test]
     fn take_until_block_ending1() -> Result<()> {
         assert!(matches!(take_until_block_ending(""), Err(_)));
         Ok(())
@@ -461,15 +201,6 @@ mod tests {
         assert!(matches!(implicit_block(""), Err(_)));
         assert!(matches!(newline(""), Err(_)));
         assert!(matches!(doc_fragment(""), Err(_)));
-        Ok(())
-    }
-
-    #[test]
-    fn strong1() -> Result<()> {
-        let input = "*testing testing*";
-        let (remaining_input, element) = strong(input)?;
-        println!("🔎 {:?}", element);
-        assert_eq!("", remaining_input);
         Ok(())
     }
 
