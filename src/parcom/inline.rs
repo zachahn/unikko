@@ -14,7 +14,7 @@ fn caps(i: &str) -> IResult<&str, Node> {
     if matched.len() <= 2 {
         return fail(i);
     }
-    let mut element = Element::new(Tag::Span, false);
+    let mut element = Element::new(Tag::Span);
     element.attrs.classes.push("caps".into());
     element.nodes.push(Node::Plain(Plain::new(matched)));
     Ok((i, Node::Element(element)))
@@ -103,7 +103,7 @@ fn link(i: &str) -> IResult<&str, Node> {
     let (i, display) = take_until("\"")(i)?;
     let (i, _) = tag("\":")(i)?;
     let (i, url) = take_while1(is_url)(i)?;
-    let mut el = Element::new(Tag::Anchor, false);
+    let mut el = Element::new(Tag::Anchor);
     el.nodes = vec![Node::Plain(Plain::new(display))];
     el.attrs.href = Some(url.to_string());
 
@@ -191,7 +191,6 @@ fn footnote_ref_link(i: &str) -> IResult<&str, Node> {
             Tag::FootnoteRefLink,
             attrs,
             vec![text],
-            false,
         )),
     ))
 }
@@ -212,7 +211,6 @@ fn footnote_ref_plain(i: &str) -> IResult<&str, Node> {
             Tag::FootnoteRefPlain,
             attrs,
             vec![text],
-            false,
         )),
     ))
 }

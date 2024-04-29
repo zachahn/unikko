@@ -68,25 +68,23 @@ pub struct Element {
     pub tag: Tag,
     pub attrs: Attributes,
     pub nodes: Vec<Node>,
-    pub extended: bool,
 }
 
 impl Element {
-    pub fn init(tag: Tag, attrs: Attributes, nodes: Vec<Node>, extended: bool) -> Self {
+    pub fn init(tag: Tag, attrs: Attributes, nodes: Vec<Node>) -> Self {
         Self {
             tag: tag,
             attrs: attrs,
             nodes: nodes,
-            extended: extended,
         }
     }
 
-    pub fn new(tag: impl Into<Tag>, extended: bool) -> Self {
-        Self::init(tag.into(), Attributes::new(), vec![], extended)
+    pub fn new(tag: impl Into<Tag>) -> Self {
+        Self::init(tag.into(), Attributes::new(), vec![])
     }
 
     pub fn empty(tag: Tag) -> Self {
-        Self::init(tag, Attributes::new(), vec![], false)
+        Self::init(tag, Attributes::new(), vec![])
     }
 }
 
