@@ -17,6 +17,7 @@ pub enum Tag {
     Em,
     I,
     A,
+    Span,
     Other(String),
 }
 
@@ -35,6 +36,7 @@ impl From<&str> for Tag {
             "a" => Tag::A,
             "b" => Tag::B,
             "strong" => Tag::Strong,
+            "%" => Tag::Span,
             _ => Tag::Other(tag_string.to_string()),
         }
     }
@@ -43,11 +45,15 @@ impl From<&str> for Tag {
 #[derive(Debug, PartialEq)]
 pub struct Attributes {
     pub href: Option<String>,
+    pub classes: Vec<String>,
 }
 
 impl Attributes {
     pub fn new() -> Self {
-        Self { href: None }
+        Self {
+            href: None,
+            classes: Vec::new(),
+        }
     }
 }
 

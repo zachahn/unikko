@@ -17,6 +17,7 @@ fn tag_name(tag: &Tag) -> &str {
         Tag::Strong => "strong",
         Tag::I => "i",
         Tag::Em => "em",
+        Tag::Span => "span",
         Tag::Other(_) => unimplemented!(),
         Tag::Doc => unimplemented!(),
     }
@@ -26,6 +27,9 @@ fn opening_tag(element: &Element, options: &Options) -> String {
     let mut buffer = format!("<{}", tag_name(&element.tag));
     if let Some(ref href) = element.attrs.href {
         buffer.push_str(format!(" href=\"{}\"", href).as_str());
+    }
+    if element.attrs.classes.len() > 0 {
+        buffer.push_str(format!(" class=\"{}\"", element.attrs.classes.join(" ")).as_str());
     }
     buffer.push_str(">");
     return buffer;

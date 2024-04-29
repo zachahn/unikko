@@ -31,22 +31,6 @@ where
     }
 }
 
-fn is_plain(chr: char) -> bool {
-    match chr {
-        'a'..='z' => true,
-        'A'..='Z' => true,
-        '0'..='9' => true,
-        ' ' => true,
-        '.' | '?' => true,
-        _ => false,
-    }
-}
-
-fn plain(i: &str) -> IResult<&str, Node> {
-    let (i, matched) = take_while1(is_plain)(i)?;
-    Ok((i, Node::Plain(Plain::new(matched))))
-}
-
 fn catchall1(i: &str) -> IResult<&str, Node> {
     let (i, matched) = take(1usize)(i)?;
     Ok((i, Node::Plain(Plain::new(matched))))
@@ -188,13 +172,30 @@ fn simple_symbols(i: &str) -> IResult<&str, Node> {
     alt((with_parens, with_squares))(i)
 }
 
+fn caps(i: &str) -> IResult<&str, Node> {
+    let (i, matched) = take_while1(|chr: char| chr.is_ascii_uppercase())(i)?;
+    if matched.len() <= 2 {
+        return fail(i);
+    }
+    let mut element = Element::new(Tag::Span, false);
+    element.attrs.classes.push("caps".into());
+    element.nodes.push(Node::Plain(Plain::new(matched)));
+    Ok((i, Node::Element(element)))
+}
+
+fn whitespace(i: &str) -> IResult<&str, Node> {
+    let (i, matched) = take_while1(|chr: char| chr == ' ')(i)?;
+    Ok((i, Node::Plain(Plain::new(matched))))
+}
+
 fn inline(i: &str) -> IResult<&str, Vec<Node>> {
     let alts = (
+        caps,
         bold,
         strong,
         italic,
         emphasized,
-        plain,
+        whitespace,
         apostrophe,
         simple_symbols,
         link,
@@ -300,15 +301,6 @@ pub fn parcom(i: &str) -> Result<Node, Error> {
 mod tests {
     use super::*;
     use anyhow::Result;
-
-    #[test]
-    fn plain1() -> Result<()> {
-        let input = "but why male models?";
-        let (remaining, node) = plain(input)?;
-        println!("🔎 {:?}", node);
-        assert_eq!(remaining, "");
-        Ok(())
-    }
 
     #[test]
     fn inline1() -> Result<()> {
