@@ -23,7 +23,6 @@ pub enum Tag {
     FootnoteId,
     FootnoteRefLink,
     FootnoteRefPlain,
-    Other(String),
 }
 
 impl TryFrom<&str> for Tag {

@@ -22,7 +22,6 @@ fn tag_name(tag: &Tag) -> &str {
         Tag::FootnoteId => "sup",
         Tag::FootnoteRefLink => "sup",
         Tag::FootnoteRefPlain => "sup",
-        Tag::Other(_) => unimplemented!(),
         Tag::Doc => unimplemented!(),
     }
 }
