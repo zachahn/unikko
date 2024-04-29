@@ -29,42 +29,57 @@ fn normalized(fragment: &str) -> String {
 }
 
 #[test]
-fn textile_to_html() -> Result<()> {
-    let mut count_all_pass = 0;
-    let mut count_all = 0;
-    let mut printed = false;
+fn textile_to_html() {
+    let mut count_total_cases = 0;
+    let mut count_total_passed = 0;
+    let mut count_total_crashes = 0;
+    let mut printed_first_failure = false;
     let mut passed_sets = Vec::<String>::new();
     for fixture_set in FixturesRoot::new() {
-        let set_name = fixture_set.name.clone();
+        let mut count_set_cases = 0;
+        let mut count_set_passed = 0;
+        let set_name = fixture_set.name;
         let test_cases = fixture_set.cases;
-        let mut test_case_names: Vec<String> = test_cases.keys().cloned().collect();
-        test_case_names.sort();
+        let test_case_names: Vec<String> = {
+            let mut unsorted: Vec<_> = test_cases.keys().cloned().collect();
+            unsorted.sort();
+            unsorted
+        };
         for case_name in test_case_names {
-            count_all += 1;
+            count_total_cases += 1;
+            count_set_cases += 1;
             let test_case = test_cases.get(case_name.as_str()).unwrap();
-            let actual = unikko::textile_to_html(test_case.input.clone())?;
+            let actual = unikko::textile_to_html(test_case.input.clone());
+            if matches!(actual, Err(_)) {
+                count_total_crashes += 1;
+                continue;
+            }
+            let actual = actual.unwrap();
             if normalized(actual.as_str()) == normalized(test_case.expect.as_str()) {
-                count_all_pass += 1;
-            } else {
-                if !printed {
-                    println!("➡️   FAILURE:\n- set: {}\n- case: {}\n", set_name, case_name);
-                    println!("➡️   INPUT:\n{}\n\n", test_case.input);
-                    println!("➡️   EXPECTED:\n{}\n\n", test_case.expect);
-                    println!("➡️   ACTUAL:\n{}\n", actual);
-                    println!(
-                        "➡️   NODES:\n{:?}",
-                        unikko::textile_to_tree(test_case.input.clone())
-                    );
-                    printed = true;
-                }
+                count_total_passed += 1;
+                count_set_passed += 1;
+                continue;
+            }
+            if !printed_first_failure {
+                println!("➡️   FAILURE:\n- set: {}\n- case: {}\n", set_name, case_name);
+                println!("➡️   INPUT:\n{}\n\n", test_case.input);
+                println!("➡️   EXPECTED:\n{}\n\n", test_case.expect);
+                println!("➡️   ACTUAL:\n{}\n", actual);
+                println!(
+                    "➡️   NODES:\n{:?}",
+                    unikko::textile_to_tree(test_case.input.clone())
+                );
+                printed_first_failure = true;
             }
         }
-        assert_eq!(
-            count_all_pass, count_all,
-            "{set_name}. passed sets: {passed_sets:?}. passed cases: {count_all_pass}. total cases: {count_all}"
-        );
-        passed_sets.push(set_name);
+        if count_set_cases == count_set_passed {
+            passed_sets.push(set_name.clone());
+        }
     }
-
-    Ok(())
+    assert_eq!(count_total_crashes, 0);
+    let count_total_failed = count_total_cases - count_total_passed;
+    assert_eq!(
+        count_total_passed, count_total_cases,
+        "{count_total_failed}. passed sets: {passed_sets:?}. passed cases: {count_total_passed}. total cases: {count_total_cases}"
+    );
 }
