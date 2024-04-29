@@ -46,7 +46,7 @@ fn bold(i: &str) -> IResult<&str, Node> {
     let (i, inside) = take_until("*")(i)?;
     let (i, _) = tag("**")(i)?;
     let (_, nodes) = all_consuming(inline)(inside)?;
-    let mut element = Element::empty(Tag::B);
+    let mut element = Element::empty(Tag::Bold);
     element.nodes = nodes;
     Ok((i, Node::Element(element)))
 }
@@ -66,7 +66,7 @@ fn italic(i: &str) -> IResult<&str, Node> {
     let (i, inside) = take_until("__")(i)?;
     let (i, _) = tag("__")(i)?;
     let (_, nodes) = all_consuming(inline)(inside)?;
-    let mut element = Element::empty(Tag::I);
+    let mut element = Element::empty(Tag::Italic);
     element.nodes = nodes;
     Ok((i, Node::Element(element)))
 }
@@ -76,7 +76,7 @@ fn emphasized(i: &str) -> IResult<&str, Node> {
     let (i, inside) = take_until("_")(i)?;
     let (i, _) = char('_')(i)?;
     let (_, nodes) = all_consuming(inline)(inside)?;
-    let mut element = Element::empty(Tag::Em);
+    let mut element = Element::empty(Tag::Emphasis);
     element.nodes = nodes;
     Ok((i, Node::Element(element)))
 }
@@ -100,7 +100,7 @@ fn link(i: &str) -> IResult<&str, Node> {
     let (i, display) = take_until("\"")(i)?;
     let (i, _) = tag("\":")(i)?;
     let (i, url) = take_while1(is_url)(i)?;
-    let mut el = Element::new(Tag::A, false);
+    let mut el = Element::new(Tag::Anchor, false);
     el.nodes = vec![Node::Plain(Plain::new(display))];
     el.attrs.href = Some(url.to_string());
 
@@ -253,8 +253,8 @@ fn blockquote(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, nodes) = inline(matched_content)?;
-    let mut bq = Element::new(Tag::Bq, false);
-    let mut p = Element::new(Tag::P, false);
+    let mut bq = Element::new(Tag::Blockquote, false);
+    let mut p = Element::new(Tag::Paragraph, false);
     p.nodes = nodes;
     bq.nodes = vec![Node::Element(p)];
     Ok((i, Node::Element(bq)))
@@ -264,7 +264,7 @@ fn implicit_block(i: &str) -> IResult<&str, Node> {
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, nodes) = all_consuming(inline)(matched_content)?;
 
-    let mut el = Element::new(Tag::P, false);
+    let mut el = Element::new(Tag::Paragraph, false);
     el.nodes = nodes;
     Ok((i, Node::Element(el)))
 }
