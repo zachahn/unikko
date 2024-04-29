@@ -197,6 +197,52 @@ fn whitespace(i: &str) -> IResult<&str, Node> {
     Ok((i, Node::Plain(Plain::new(matched))))
 }
 
+fn footnote_ref_link(i: &str) -> IResult<&str, Node> {
+    let (i, matched) = delimited(
+        char('['),
+        take_while1(|chr: char| chr.is_ascii_digit()),
+        tag("]"),
+    )(i)?;
+    let text = Node::Plain(Plain::new(matched));
+    let mut attrs = Attributes::new();
+    attrs.classes.push("footnote".to_owned());
+    attrs.id = Some("fnrev".to_owned());
+    Ok((
+        i,
+        Node::Element(Element::init(
+            Tag::FootnoteRefLink,
+            attrs,
+            vec![text],
+            false,
+        )),
+    ))
+}
+
+fn footnote_ref_plain(i: &str) -> IResult<&str, Node> {
+    let (i, matched) = delimited(
+        char('['),
+        take_while1(|chr: char| chr.is_ascii_digit()),
+        tag("!]"),
+    )(i)?;
+    let text = Node::Plain(Plain::new(matched));
+    let mut attrs = Attributes::new();
+    attrs.classes.push("footnote".to_owned());
+    attrs.id = Some("fnrev".to_owned());
+    Ok((
+        i,
+        Node::Element(Element::init(
+            Tag::FootnoteRefPlain,
+            attrs,
+            vec![text],
+            false,
+        )),
+    ))
+}
+
+fn footnote_ref(i: &str) -> IResult<&str, Node> {
+    alt((footnote_ref_link, footnote_ref_plain))(i)
+}
+
 fn inline(i: &str) -> IResult<&str, Vec<Node>> {
     let alts = (
         word,
@@ -205,6 +251,7 @@ fn inline(i: &str) -> IResult<&str, Vec<Node>> {
         italic,
         emphasized,
         whitespace,
+        footnote_ref,
         apostrophe,
         simple_symbols,
         link,
@@ -278,8 +325,64 @@ fn implicit_block(i: &str) -> IResult<&str, Node> {
     Ok((i, Node::Element(el)))
 }
 
+fn footnote_plain(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("fn")(i)?;
+    let (i, matched) = take_while1(|chr: char| chr.is_ascii_digit())(i)?;
+    let (i, _) = tag(". ")(i)?;
+    let (i, matched_content) = take_until_block_ending(i)?;
+    let (_, mut nodes) = inline(matched_content)?;
+    let mut el = Element::new(Tag::Footnote, false);
+    el.attrs.classes.push("footnote".to_string());
+    el.attrs.id = Some("fn".to_string());
+    el.nodes.append(&mut nodes);
+    Ok((i, Node::Element(el)))
+}
+
+fn footnote_link(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("fn")(i)?;
+    let (i, matched) = take_while1(|chr: char| chr.is_ascii_digit())(i)?;
+    let (i, _) = tag("^. ")(i)?;
+    let (i, matched_content) = take_until_block_ending(i)?;
+    let (_, mut nodes) = inline(matched_content)?;
+    let mut link_up_attrs = Attributes::new();
+    link_up_attrs.href = Some("#fnrev".to_owned());
+    let link_up = Element::init(
+        Tag::Anchor,
+        link_up_attrs,
+        vec![Node::Plain(Plain::new(matched))],
+        false,
+    );
+    let superscript = Element::init(
+        Tag::FootnoteId,
+        Attributes::new(),
+        vec![Node::Element(link_up)],
+        false,
+    );
+    let mut attrs = Attributes::new();
+    attrs.classes.push("footnote".to_string());
+    attrs.id = Some("fn".to_string());
+    let mut el = Element::init(
+        Tag::Footnote,
+        attrs,
+        vec![Node::Element(superscript), Node::Plain(Plain::new(" "))],
+        false,
+    );
+    el.nodes.append(&mut nodes);
+    Ok((i, Node::Element(el)))
+}
+
+fn footnote(i: &str) -> IResult<&str, Node> {
+    alt((footnote_plain, footnote_link))(i)
+}
+
 fn doc_fragment(i: &str) -> IResult<&str, Node> {
-    let alts = (newline, blockquote, explicit_block, implicit_block);
+    let alts = (
+        newline,
+        blockquote,
+        footnote,
+        explicit_block,
+        implicit_block,
+    );
     alt(alts)(i)
 }
 

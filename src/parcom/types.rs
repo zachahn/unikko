@@ -18,6 +18,10 @@ pub enum Tag {
     Italic,
     Anchor,
     Span,
+    Footnote,
+    FootnoteId,
+    FootnoteRefLink,
+    FootnoteRefPlain,
     Other(String),
 }
 
@@ -44,14 +48,16 @@ impl From<&str> for Tag {
 
 #[derive(Debug, PartialEq)]
 pub struct Attributes {
-    pub href: Option<String>,
     pub classes: Vec<String>,
+    pub href: Option<String>,
+    pub id: Option<String>,
 }
 
 impl Attributes {
     pub fn new() -> Self {
         Self {
             href: None,
+            id: None,
             classes: Vec::new(),
         }
     }

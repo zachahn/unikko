@@ -18,6 +18,10 @@ fn tag_name(tag: &Tag) -> &str {
         Tag::Italic => "i",
         Tag::Emphasis => "em",
         Tag::Span => "span",
+        Tag::Footnote => "p",
+        Tag::FootnoteId => "sup",
+        Tag::FootnoteRefLink => "sup",
+        Tag::FootnoteRefPlain => "sup",
         Tag::Other(_) => unimplemented!(),
         Tag::Doc => unimplemented!(),
     }
@@ -30,6 +34,9 @@ fn opening_tag(element: &Element, options: &Options) -> String {
     }
     if element.attrs.classes.len() > 0 {
         buffer.push_str(format!(" class=\"{}\"", element.attrs.classes.join(" ")).as_str());
+    }
+    if let Some(ref id) = element.attrs.id {
+        buffer.push_str(format!(" id=\"{}\"", id).as_str());
     }
     buffer.push_str(">");
     return buffer;
