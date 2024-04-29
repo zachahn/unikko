@@ -173,7 +173,7 @@ fn simple_symbols(i: &str) -> IResult<&str, Node> {
 }
 
 fn caps(i: &str) -> IResult<&str, Node> {
-    let (i, matched) = take_while1(|chr: char| chr.is_ascii_uppercase())(i)?;
+    let (i, matched) = take_while1(|chr: char| chr.is_uppercase())(i)?;
     if matched.len() <= 2 {
         return fail(i);
     }
@@ -183,6 +183,15 @@ fn caps(i: &str) -> IResult<&str, Node> {
     Ok((i, Node::Element(element)))
 }
 
+fn plain(i: &str) -> IResult<&str, Node> {
+    let (i, matched) = take_while1(|chr: char| chr.is_alphabetic())(i)?;
+    Ok((i, Node::Plain(Plain::new(matched))))
+}
+
+fn word(i: &str) -> IResult<&str, Node> {
+    alt((caps, plain))(i)
+}
+
 fn whitespace(i: &str) -> IResult<&str, Node> {
     let (i, matched) = take_while1(|chr: char| chr == ' ')(i)?;
     Ok((i, Node::Plain(Plain::new(matched))))
@@ -190,7 +199,7 @@ fn whitespace(i: &str) -> IResult<&str, Node> {
 
 fn inline(i: &str) -> IResult<&str, Vec<Node>> {
     let alts = (
-        caps,
+        word,
         bold,
         strong,
         italic,
