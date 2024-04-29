@@ -202,7 +202,7 @@ fn inline(i: &str) -> IResult<&str, Vec<Node>> {
         newline,
         catchall1,
     );
-    many1(alt(alts))(i)
+    all_consuming(many1(alt(alts)))(i)
 }
 
 fn take_until_block_ending(i: &str) -> IResult<&str, &str> {
@@ -240,7 +240,7 @@ fn explicit_block(i: &str) -> IResult<&str, Node> {
     let (i, matched_tag) = alt(acceptable_tags)(i)?;
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
-    let (_, nodes) = all_consuming(inline)(matched_content)?;
+    let (_, nodes) = inline(matched_content)?;
 
     let mut el = Element::new(matched_tag, false);
     el.nodes = nodes;
@@ -262,7 +262,7 @@ fn blockquote(i: &str) -> IResult<&str, Node> {
 
 fn implicit_block(i: &str) -> IResult<&str, Node> {
     let (i, matched_content) = take_until_block_ending(i)?;
-    let (_, nodes) = all_consuming(inline)(matched_content)?;
+    let (_, nodes) = inline(matched_content)?;
 
     let mut el = Element::new(Tag::Paragraph, false);
     el.nodes = nodes;
