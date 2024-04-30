@@ -33,6 +33,7 @@ fn textile_to_html() {
     let mut count_total_cases = 0;
     let mut count_total_passed = 0;
     let mut count_total_crashes = 0;
+    let mut count_total_skipped = 0;
     let mut printed_first_failure = false;
     let mut passed_sets = Vec::<String>::new();
     for fixture_set in FixturesRoot::new() {
@@ -49,6 +50,10 @@ fn textile_to_html() {
             count_total_cases += 1;
             count_set_cases += 1;
             let test_case = test_cases.get(case_name.as_str()).unwrap();
+            if matches!(test_case.class, Some(_)) || matches!(test_case.setup, Some(_)) {
+                count_total_skipped += 1;
+                continue;
+            }
             let actual = unikko::textile_to_html(test_case.input.clone());
             if matches!(actual, Err(_)) {
                 count_total_crashes += 1;
@@ -62,6 +67,12 @@ fn textile_to_html() {
             }
             if !printed_first_failure {
                 println!("➡️   FAILURE:\n- set: {}\n- case: {}\n", set_name, case_name);
+                if let Some(ref note) = test_case.note {
+                    println!("➡️   NOTE:\n{}\n", note);
+                }
+                if let Some(ref setup) = test_case.setup {
+                    println!("➡️   SETUP:\n{:?}\n", setup);
+                }
                 println!("➡️   INPUT:\n{}\n\n", test_case.input);
                 println!("➡️   EXPECTED:\n{}\n\n", test_case.expect);
                 println!("➡️   ACTUAL:\n{}\n", actual);
@@ -80,6 +91,6 @@ fn textile_to_html() {
     let count_total_failed = count_total_cases - count_total_passed;
     assert_eq!(
         count_total_passed, count_total_cases,
-        "{count_total_failed}. passed sets: {passed_sets:?}. passed cases: {count_total_passed}. total cases: {count_total_cases}"
+        "{count_total_failed}. passed sets: {passed_sets:?}. skipped: {count_total_skipped}, passed: {count_total_passed}. total: {count_total_cases}"
     );
 }

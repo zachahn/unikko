@@ -12,11 +12,28 @@ pub struct FixtureSet {
     pub name: String,
 }
 
+#[derive(Eq, Hash, PartialEq, Debug, Serialize, Deserialize)]
+#[allow(non_camel_case_types)]
+pub enum FixtureSetup {
+    setRestricted,
+    setLite,
+    setImages,
+    setLinkRelationShip,
+    setDimensionlessImages,
+    setBlockTags,
+    setImagePrefix,
+    setLinkPrefix,
+    setRawBlocks,
+    setLineWrap,
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct FixtureTestCase {
     pub note: Option<String>,
+    pub class: Option<String>,
     pub input: String,
     pub expect: String,
+    pub setup: Option<Vec<HashMap<FixtureSetup, String>>>,
 }
 
 impl FixturesRoot {
