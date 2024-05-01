@@ -196,6 +196,17 @@ fn footnote_ref(i: &str) -> IResult<&str, Node> {
     Ok((i, Node::Element(element)))
 }
 
+fn emdash(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("--")(i)?;
+    Ok((i, Node::Symbol(Symbol::Emdash)))
+}
+
+/// This needs to be parsed before `whitespace`
+fn endash(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag(" - ")(i)?;
+    Ok((i, Node::Symbol(Symbol::Endash)))
+}
+
 pub fn handle_inline(i: &str) -> IResult<&str, Vec<Node>> {
     let alts = (
         word,
@@ -203,9 +214,11 @@ pub fn handle_inline(i: &str) -> IResult<&str, Vec<Node>> {
         strong,
         italic,
         emphasized,
+        endash,
         whitespace,
         footnote_ref,
         apostrophe,
+        emdash,
         simple_symbols,
         link,
         newline,

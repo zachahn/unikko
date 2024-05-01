@@ -3,6 +3,8 @@ use std::collections::HashMap;
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum Symbol {
     Apostrophe,
+    Emdash,
+    Endash,
     Trademark,
     Registered,
     Copyright,
@@ -75,8 +77,8 @@ impl Options {
             // ("prime", "&#8242;"),
             // ("prime_double", "&#8243;"),
             // ("ellipsis", "&#8230;"),
-            // ("emdash", "&#8212;"),
-            // ("endash", "&#8211;"),
+            (Symbol::Emdash, "&#8212;"),
+            (Symbol::Endash, "&#8211;"),
             // ("dimension", "&#215;"),
             (Symbol::Trademark, "&#8482;"),
             (Symbol::Registered, "&#174;"),
