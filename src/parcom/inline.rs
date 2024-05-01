@@ -173,36 +173,27 @@ fn simple_symbols(i: &str) -> IResult<&str, Node> {
     alt((with_parens, with_squares))(i)
 }
 
-fn footnote_ref_link(i: &str) -> IResult<&str, Node> {
-    let (i, matched) = delimited(
-        char('['),
-        take_while1(|chr: char| chr.is_ascii_digit()),
-        tag("]"),
-    )(i)?;
-    let element = Element::attrs_nodes(
-        Tag::FootnoteRefLink,
-        Attributes::classes_id(vec!["footnote".into()], "fnrev".into()),
-        vec![Node::Plain(Plain::new(matched))],
-    );
-    Ok((i, Node::Element(element)))
-}
-
-fn footnote_ref_plain(i: &str) -> IResult<&str, Node> {
-    let (i, matched) = delimited(
-        char('['),
-        take_while1(|chr: char| chr.is_ascii_digit()),
-        tag("!]"),
-    )(i)?;
-    let element = Element::attrs_nodes(
-        Tag::FootnoteRefPlain,
-        Attributes::classes_id(vec!["footnote".into()], "fnrev".into()),
-        vec![Node::Plain(Plain::new(matched))],
-    );
-    Ok((i, Node::Element(element)))
-}
-
 fn footnote_ref(i: &str) -> IResult<&str, Node> {
-    alt((footnote_ref_link, footnote_ref_plain))(i)
+    let (i, _) = char('[')(i)?;
+    let (i, matched) = take_while1(|chr: char| chr.is_ascii_digit())(i)?;
+    let (i, superscript) = if i.starts_with("!]") {
+        (&i[2..], Node::Plain(Plain::new(matched)))
+    } else if i.starts_with("]") {
+        let link_down = Element::attrs_nodes(
+            Tag::Anchor,
+            Attributes::href("#fn".into()),
+            vec![Node::Plain(Plain::new(matched))],
+        );
+        (&i[1..], link_down.into())
+    } else {
+        return fail(i);
+    };
+    let element = Element::attrs_nodes(
+        Tag::FootnoteRef,
+        Attributes::classes_id(vec!["footnote".into()], "fnrev".into()),
+        vec![superscript],
+    );
+    Ok((i, Node::Element(element)))
 }
 
 pub fn handle_inline(i: &str) -> IResult<&str, Vec<Node>> {

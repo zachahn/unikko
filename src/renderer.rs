@@ -20,8 +20,7 @@ fn tag_name(tag: &Tag) -> &str {
         Tag::Span => "span",
         Tag::Footnote => "p",
         Tag::FootnoteId => "sup",
-        Tag::FootnoteRefLink => "sup",
-        Tag::FootnoteRefPlain => "sup",
+        Tag::FootnoteRef => "sup",
         Tag::Doc => unimplemented!(),
     }
 }

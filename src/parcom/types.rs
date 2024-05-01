@@ -21,8 +21,7 @@ pub enum Tag {
     Span,
     Footnote,
     FootnoteId,
-    FootnoteRefLink,
-    FootnoteRefPlain,
+    FootnoteRef,
 }
 
 impl TryFrom<&str> for Tag {

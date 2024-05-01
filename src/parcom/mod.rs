@@ -77,36 +77,33 @@ fn implicit_block(i: &str) -> IResult<&str, Node> {
     Ok((i, Node::Element(el)))
 }
 
-fn footnote_plain(i: &str) -> IResult<&str, Node> {
+fn footnote(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag("fn")(i)?;
     let (i, matched) = take_while1(|chr: char| chr.is_ascii_digit())(i)?;
-    let (i, _) = tag(". ")(i)?;
+    let (i, superscript) = if i.starts_with("^. ") {
+        let link_up = Element::attrs_nodes(
+            Tag::Anchor,
+            Attributes::href("#fnrev".into()),
+            vec![Node::Plain(Plain::new(matched))],
+        );
+        let superscript = Element::attrs_nodes(
+            Tag::FootnoteId,
+            Attributes::new(),
+            vec![Node::Element(link_up)],
+        );
+        (&i[3..], superscript)
+    } else if i.starts_with(". ") {
+        let superscript = Element::attrs_nodes(
+            Tag::FootnoteId,
+            Attributes::new(),
+            vec![Node::Plain(Plain::new(matched))],
+        );
+        (&i[2..], superscript)
+    } else {
+        return fail(i);
+    };
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, mut nodes) = handle_inline(matched_content)?;
-    let mut el = Element::attrs(
-        Tag::Footnote,
-        Attributes::classes_id(vec!["footnote".into()], "fn".into()),
-    );
-    el.nodes.append(&mut nodes);
-    Ok((i, Node::Element(el)))
-}
-
-fn footnote_link(i: &str) -> IResult<&str, Node> {
-    let (i, _) = tag("fn")(i)?;
-    let (i, matched) = take_while1(|chr: char| chr.is_ascii_digit())(i)?;
-    let (i, _) = tag("^. ")(i)?;
-    let (i, matched_content) = take_until_block_ending(i)?;
-    let (_, mut nodes) = handle_inline(matched_content)?;
-    let link_up = Element::attrs_nodes(
-        Tag::Anchor,
-        Attributes::href("#fnrev".into()),
-        vec![Node::Plain(Plain::new(matched))],
-    );
-    let superscript = Element::attrs_nodes(
-        Tag::FootnoteId,
-        Attributes::new(),
-        vec![Node::Element(link_up)],
-    );
     let mut el = Element::attrs_nodes(
         Tag::Footnote,
         Attributes::classes_id(vec!["footnote".into()], "fn".into()),
@@ -114,10 +111,6 @@ fn footnote_link(i: &str) -> IResult<&str, Node> {
     );
     el.nodes.append(&mut nodes);
     Ok((i, Node::Element(el)))
-}
-
-fn footnote(i: &str) -> IResult<&str, Node> {
-    alt((footnote_plain, footnote_link))(i)
 }
 
 fn doc_fragment(i: &str) -> IResult<&str, Node> {
