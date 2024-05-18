@@ -80,30 +80,25 @@ fn implicit_block(i: &str) -> IResult<&str, Node> {
 fn footnote(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag("fn")(i)?;
     let (i, matched) = take_while1(|chr: char| chr.is_ascii_digit())(i)?;
-    let (i, superscript) = if i.starts_with("^. ") {
+    let (i, superscript_content) = if i.starts_with("^. ") {
         let link_up = Element::attrs_nodes(
             Tag::Anchor,
             Attributes::href("#fnrev".into()),
             vec![Node::Plain(Plain::new(matched))],
         );
-        let superscript = Element::attrs_nodes(
-            Tag::FootnoteId,
-            Attributes::new(),
-            vec![Node::Element(link_up)],
-        );
-        (&i[3..], superscript)
+        (&i[3..], Node::Element(link_up))
     } else if i.starts_with(". ") {
-        let superscript = Element::attrs_nodes(
-            Tag::FootnoteId,
-            Attributes::new(),
-            vec![Node::Plain(Plain::new(matched))],
-        );
-        (&i[2..], superscript)
+        (&i[2..], Node::Plain(Plain::new(matched)))
     } else {
         return fail(i);
     };
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, mut nodes) = handle_inline(matched_content)?;
+    let superscript = Element::attrs_nodes(
+        Tag::FootnoteId,
+        Attributes::new(),
+        vec![superscript_content],
+    );
     let mut el = Element::attrs_nodes(
         Tag::Footnote,
         Attributes::classes_id(vec!["footnote".into()], "fn".into()),
