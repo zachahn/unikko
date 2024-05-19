@@ -2,6 +2,10 @@ use std::collections::HashMap;
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum Symbol {
+    QuoteSingleOpen,
+    QuoteSingleClose,
+    QuoteDoubleOpen,
+    QuoteDoubleClose,
     Apostrophe,
     Emdash,
     Endash,
@@ -69,10 +73,10 @@ impl Options {
 
     fn canonical_symbols() -> HashMap<Symbol, String> {
         let pairs = [
-            // ("quote_single_open", "&#8216;"),
-            // ("quote_single_close", "&#8217;"),
-            // ("quote_double_open", "&#8220;"),
-            // ("quote_double_close", "&#8221;"),
+            (Symbol::QuoteSingleOpen, "&#8216;"),
+            (Symbol::QuoteSingleClose, "&#8217;"),
+            (Symbol::QuoteDoubleOpen, "&#8220;"),
+            (Symbol::QuoteDoubleClose, "&#8221;"),
             (Symbol::Apostrophe, "&#8217;"),
             // ("prime", "&#8242;"),
             // ("prime_double", "&#8243;"),
