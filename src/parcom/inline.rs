@@ -157,6 +157,11 @@ fn plus_minus(i: &str) -> IResult<&str, Node> {
     Ok((i, Node::Symbol(Symbol::PlusMinus)))
 }
 
+fn ellipsis(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("...")(i)?;
+    Ok((i, Node::Symbol(Symbol::Ellipsis)))
+}
+
 fn simple_symbols(i: &str) -> IResult<&str, Node> {
     let symbols = (
         trademark,
@@ -214,10 +219,11 @@ pub fn handle_inline(i: &str) -> IResult<&str, Vec<Node>> {
         strong,
         italic,
         emphasized,
-        endash,
+        endash, // endash must be before whitespace
         whitespace,
         footnote_ref,
         apostrophe,
+        ellipsis,
         emdash,
         simple_symbols,
         link,
