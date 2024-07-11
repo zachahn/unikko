@@ -46,6 +46,7 @@ pub struct Attributes {
     pub classes: Vec<String>,
     pub href: Option<String>,
     pub id: Option<String>,
+    pub style: Option<String>,
 }
 
 impl Attributes {
@@ -54,6 +55,7 @@ impl Attributes {
             href: None,
             id: None,
             classes: Vec::new(),
+            style: None,
         }
     }
 
@@ -62,6 +64,7 @@ impl Attributes {
             href: Some(href),
             id: None,
             classes: Vec::new(),
+            style: None,
         }
     }
 
@@ -70,6 +73,7 @@ impl Attributes {
             href: None,
             id: None,
             classes: classes,
+            style: None,
         }
     }
 
@@ -78,6 +82,7 @@ impl Attributes {
             href: None,
             id: Some(id),
             classes: classes,
+            style: None,
         }
     }
 }

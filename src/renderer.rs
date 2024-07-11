@@ -30,6 +30,9 @@ fn opening_tag(element: &Element, options: &Options) -> String {
     if let Some(ref href) = element.attrs.href {
         buffer.push_str(format!(" href=\"{}\"", href).as_str());
     }
+    if let Some(ref style) = element.attrs.style {
+        buffer.push_str(format!(" style=\"{}\"", style).as_str());
+    }
     if element.attrs.classes.len() > 0 {
         buffer.push_str(format!(" class=\"{}\"", element.attrs.classes.join(" ")).as_str());
     }

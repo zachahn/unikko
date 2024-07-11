@@ -1,17 +1,18 @@
+mod attributes;
 mod inline;
 mod types;
 mod utils;
 
-use crate::parcom::inline::handle_inline;
 pub use crate::parcom::types::*;
 use crate::Error;
 use crate::Error::ParComError;
+use attributes::handle_attributes;
+use inline::handle_inline;
 
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_while, take_while1};
+use nom::bytes::complete::{tag, take_while1};
 use nom::character::complete::char;
 use nom::combinator::fail;
-use nom::combinator::opt;
 use nom::multi::many0;
 use nom::IResult;
 
@@ -53,20 +54,22 @@ fn explicit_block(i: &str) -> IResult<&str, Node> {
         tag("h6"),
     );
     let (i, matched_tag) = alt(acceptable_tags)(i)?;
+    let (i, attrs) = handle_attributes(i)?;
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, nodes) = handle_inline(matched_content)?;
-    let el = Element::nodes(Tag::try_from(matched_tag).unwrap(), nodes);
+    let el = Element::attrs_nodes(Tag::try_from(matched_tag).unwrap(), attrs, nodes);
     Ok((i, Node::Element(el)))
 }
 
 fn blockquote(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag("bq")(i)?;
+    let (i, attrs) = handle_attributes(i)?;
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, nodes) = handle_inline(matched_content)?;
     let p = Element::nodes(Tag::Paragraph, nodes);
-    let bq = Element::nodes(Tag::Blockquote, vec![Node::Element(p)]);
+    let bq = Element::attrs_nodes(Tag::Blockquote, attrs, vec![Node::Element(p)]);
     Ok((i, Node::Element(bq)))
 }
 
@@ -76,29 +79,6 @@ fn implicit_block(i: &str) -> IResult<&str, Node> {
 
     let el = Element::nodes(Tag::Paragraph, nodes);
     Ok((i, Node::Element(el)))
-}
-
-fn classes_ids<'a, 'b>(i: &'a str, attrs: &'b mut Attributes) -> IResult<&'a str, ()> {
-    let (i, _) = tag("(")(i)?;
-    let (i, caught) = take_while1(|chr: char| !chr.is_control() && chr != ')')(i)?;
-    let (i, _) = tag(")")(i)?;
-    let (ids, classes) = opt(take_while(|chr: char| chr != '#'))(caught)?;
-    for class in classes.unwrap_or("").split(" ") {
-        attrs.classes.push(class.into());
-    }
-    for id in ids.split("#") {
-        if id == "" {
-            continue;
-        }
-        attrs.id = Some(id.into())
-    }
-    Ok((i, ()))
-}
-
-fn attributes(i: &str) -> IResult<&str, Attributes> {
-    let mut attrs = Attributes::new();
-    let (i, _) = classes_ids(i, &mut attrs).unwrap_or_else(|_| (i, ()));
-    Ok((i, attrs))
 }
 
 fn footnote(i: &str) -> IResult<&str, Node> {
@@ -114,7 +94,7 @@ fn footnote(i: &str) -> IResult<&str, Node> {
     } else {
         (i, Node::Plain(Plain::new(matched)))
     };
-    let (i, mut el_attrs) = attributes(i)?;
+    let (i, mut el_attrs) = handle_attributes(i)?;
     let (i, _) = tag(". ")(i)?;
     let (i, matched_content) = take_until_block_ending(i)?;
     let (_, mut nodes) = handle_inline(matched_content)?;
