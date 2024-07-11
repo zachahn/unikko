@@ -212,8 +212,18 @@ fn endash(i: &str) -> IResult<&str, Node> {
     Ok((i, Node::Symbol(Symbol::Endash)))
 }
 
+fn open_close_quotes(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("\"\"")(i)?;
+    let symbols = vec![
+        Node::Symbol(Symbol::QuoteDoubleOpen),
+        Node::Symbol(Symbol::QuoteDoubleClose),
+    ];
+    Ok((i, Node::Multiple(symbols)))
+}
+
 pub fn handle_inline(i: &str) -> IResult<&str, Vec<Node>> {
     let alts = (
+        open_close_quotes,
         word,
         bold,
         strong,
@@ -253,6 +263,20 @@ mod tests {
         let (remaining, node) = handle_inline(input)?;
         println!("🔎 {:?}", node);
         assert_eq!(remaining, "");
+        Ok(())
+    }
+
+    #[test]
+    fn handle_inline3() -> Result<()> {
+        let (remaining, nodes) = handle_inline("\"\"")?;
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(
+            nodes[0],
+            Node::Multiple(vec!(
+                Node::Symbol(Symbol::QuoteDoubleOpen),
+                Node::Symbol(Symbol::QuoteDoubleClose)
+            ))
+        );
         Ok(())
     }
 
