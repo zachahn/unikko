@@ -76,6 +76,11 @@ fn recursively_render(
                 buffer.push_str(replacement);
             }
         }
+        Node::Multiple(nodes) => {
+            for node in nodes {
+                recursively_render(buffer, options, node)?
+            }
+        }
     }
     Ok(())
 }

@@ -148,6 +148,8 @@ pub enum Node {
     Element(Element),
     Plain(Plain),
     Symbol(Symbol),
+
+    Multiple(Vec<Node>),
 }
 
 impl From<Element> for Node {
@@ -175,6 +177,12 @@ impl fmt::Debug for Node {
             Node::Element(element) => write!(f, "{:?}", element),
             Node::Plain(plain) => write!(f, "{:?}", plain),
             Node::Symbol(symbol) => write!(f, "{:?}", symbol),
+            Node::Multiple(nodes) => {
+                for node in nodes {
+                    node.fmt(f)?;
+                }
+                Ok(())
+            }
         }
     }
 }
