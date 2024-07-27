@@ -3,11 +3,12 @@ pub use crate::parcom::types::*;
 
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take, take_until, take_while1};
-use nom::character::complete::char;
+use nom::character::complete::{char, one_of};
 use nom::combinator::{all_consuming, fail};
 use nom::multi::many1;
 use nom::sequence::delimited;
 use nom::IResult;
+
 
 fn caps(i: &str) -> IResult<&str, Node> {
     let (i, matched) = take_while1(|chr: char| chr.is_uppercase())(i)?;
@@ -212,7 +213,8 @@ fn endash(i: &str) -> IResult<&str, Node> {
     Ok((i, Node::Symbol(Symbol::Endash)))
 }
 
-fn open_close_quotes(i: &str) -> IResult<&str, Node> {
+/// This needs to be parsed after link
+fn sequential_double_quote(i: &str) -> IResult<&str, Node> {
     let (i, _) = tag("\"\"")(i)?;
     let symbols = vec![
         Node::Symbol(Symbol::QuoteDoubleOpen),
@@ -221,9 +223,19 @@ fn open_close_quotes(i: &str) -> IResult<&str, Node> {
     Ok((i, Node::Multiple(symbols)))
 }
 
+/// This needs to be parsed after link
+fn solo_double_quote(i: &str) -> IResult<&str, Node> {
+    let (i, _) = tag("\"")(i)?;
+    let next_char: IResult<&str, char> = one_of("\t ")(i);
+    if matches!(next_char, Ok(_)) {
+        Ok((i, Node::Symbol(Symbol::QuoteDoubleClose)))
+    } else {
+        Ok((i, Node::Symbol(Symbol::QuoteDoubleOpen)))
+    }
+}
+
 pub fn handle_inline(i: &str) -> IResult<&str, Vec<Node>> {
     let alts = (
-        open_close_quotes,
         word,
         bold,
         strong,
@@ -237,6 +249,8 @@ pub fn handle_inline(i: &str) -> IResult<&str, Vec<Node>> {
         emdash,
         simple_symbols,
         link,
+        sequential_double_quote, // This needs to be parsed after link
+        solo_double_quote, // This needs to be parsed after link
         newline,
         fallback1,
     );
@@ -286,6 +300,25 @@ mod tests {
         let (remaining_input, element) = strong(input)?;
         println!("🔎 {:?}", element);
         assert_eq!("", remaining_input);
+        Ok(())
+    }
+
+    #[test]
+    fn quotes_between_text() -> Result<()> {
+        let (remaining, nodes) = handle_inline(r#""test"test""#)?;
+        assert_eq!(remaining, "");
+        assert_eq!(nodes[0], Node::Symbol(Symbol::QuoteDoubleOpen));
+        assert_eq!(nodes[1], Node::Plain(Plain::new("test")));
+        assert_eq!(nodes[2], Node::Symbol(Symbol::QuoteDoubleOpen));
+        assert_eq!(nodes[3], Node::Plain(Plain::new("test")));
+        assert_eq!(nodes[4], Node::Symbol(Symbol::QuoteDoubleClose));
+        let (remaining, nodes) = handle_inline(r#"'test'test'"#)?;
+        assert_eq!(remaining, "");
+        assert_eq!(nodes[0], Node::Symbol(Symbol::QuoteSingleOpen));
+        assert_eq!(nodes[1], Node::Plain(Plain::new("test")));
+        assert_eq!(nodes[2], Node::Symbol(Symbol::QuoteSingleClose));
+        assert_eq!(nodes[3], Node::Plain(Plain::new("test")));
+        assert_eq!(nodes[4], Node::Symbol(Symbol::QuoteSingleClose));
         Ok(())
     }
 }
