@@ -3,6 +3,9 @@ use thiserror::Error;
 mod convenience;
 mod error;
 mod options;
+mod pulp {
+    mod first_pass;
+}
 
 pub use error::Error;
 pub use options::Options;
