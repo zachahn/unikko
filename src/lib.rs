@@ -5,6 +5,7 @@ mod error;
 mod options;
 mod pulp {
     mod pass_1;
+    mod pass_2;
 }
 
 pub use error::Error;
