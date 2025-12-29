@@ -3,10 +3,7 @@ use thiserror::Error;
 mod convenience;
 mod error;
 mod options;
-mod pulp {
-    mod pass_1;
-    mod pass_2;
-}
+mod pulp;
 
 pub use error::Error;
 pub use options::Options;
