@@ -1,11 +1,11 @@
 use super::pass_1::{FirstPass, FirstPassEvent};
 
 #[derive(Debug)]
-pub enum SecondPassEvent {
+pub enum SecondPassEvent<'a> {
     Paragraph,
     ParagraphEnd,
 
-    Text(usize, usize),
+    Text(usize, usize, &'a str),
     LineBreak(usize, usize),
 }
 
@@ -15,8 +15,7 @@ pub struct SecondPass<'a> {
     first_pass: FirstPass<'a>,
     current_1_event: Option<FirstPassEvent>,
     position: usize,
-    previous: Option<SecondPassEvent>,
-    stack: Vec<SecondPassEvent>,
+    stack: Vec<SecondPassEvent<'a>>,
     expecting_block: bool,
 }
 
@@ -28,7 +27,6 @@ impl<'a> SecondPass<'a> {
             first_pass: FirstPass::new(input),
             current_1_event: None,
             position: 0,
-            previous: None,
             stack: vec![],
             expecting_block: true,
         }
@@ -36,7 +34,7 @@ impl<'a> SecondPass<'a> {
 }
 
 impl<'a> Iterator for SecondPass<'a> {
-    type Item = SecondPassEvent;
+    type Item = SecondPassEvent<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // Pull the next FirstPassNode
@@ -66,7 +64,7 @@ impl<'a> Iterator for SecondPass<'a> {
                 }
 
                 self.current_1_event = None;
-                return Some(SecondPassEvent::Text(start, end));
+                return Some(SecondPassEvent::Text(start, end, &self.input[start..end]));
             }
             Some(FirstPassEvent::Break(_, _)) => {
                 self.current_1_event = None;
@@ -75,7 +73,7 @@ impl<'a> Iterator for SecondPass<'a> {
                     None => return self.next(),
                     Some(SecondPassEvent::Paragraph) => return Some(SecondPassEvent::ParagraphEnd),
                     Some(SecondPassEvent::ParagraphEnd) => return self.next(),
-                    Some(SecondPassEvent::Text(_, _)) => return self.next(),
+                    Some(SecondPassEvent::Text(_, _, _)) => return self.next(),
                     Some(SecondPassEvent::LineBreak(_, _)) => return self.next(),
                 }
             }
@@ -100,7 +98,10 @@ mod tests {
     fn implicit_paragraph() -> Result<()> {
         let mut pulp = SecondPass::new("A paragraph");
         assert!(matches!(pulp.next(), Some(SecondPassEvent::Paragraph)));
-        assert!(matches!(pulp.next(), Some(SecondPassEvent::Text(0, 11))));
+        assert!(matches!(
+            pulp.next(),
+            Some(SecondPassEvent::Text(0, 11, "A paragraph"))
+        ));
         assert!(matches!(pulp.next(), Some(SecondPassEvent::ParagraphEnd)));
         assert!(matches!(pulp.next(), None));
         Ok(())
@@ -110,10 +111,16 @@ mod tests {
     fn implicit_paragraphs() -> Result<()> {
         let mut pulp = SecondPass::new("Paragraph 1\n\nParagraph 2");
         assert!(matches!(pulp.next(), Some(SecondPassEvent::Paragraph)));
-        assert!(matches!(pulp.next(), Some(SecondPassEvent::Text(0, 11))));
+        assert!(matches!(
+            pulp.next(),
+            Some(SecondPassEvent::Text(0, 11, "Paragraph 1"))
+        ));
         assert!(matches!(pulp.next(), Some(SecondPassEvent::ParagraphEnd)));
         assert!(matches!(pulp.next(), Some(SecondPassEvent::Paragraph)));
-        assert!(matches!(pulp.next(), Some(SecondPassEvent::Text(13, 24))));
+        assert!(matches!(
+            pulp.next(),
+            Some(SecondPassEvent::Text(13, 24, "Paragraph 2"))
+        ));
         assert!(matches!(pulp.next(), Some(SecondPassEvent::ParagraphEnd)));
         assert!(matches!(pulp.next(), None));
         Ok(())
@@ -123,12 +130,18 @@ mod tests {
     fn paragraph_and_not_a_paragraph() -> Result<()> {
         let mut pulp = SecondPass::new("Paragraph and newline\np. with fake");
         assert!(matches!(pulp.next(), Some(SecondPassEvent::Paragraph)));
-        assert!(matches!(pulp.next(), Some(SecondPassEvent::Text(0, 21))));
+        assert!(matches!(
+            pulp.next(),
+            Some(SecondPassEvent::Text(0, 21, "Paragraph and newline"))
+        ));
         assert!(matches!(
             pulp.next(),
             Some(SecondPassEvent::LineBreak(21, 22))
         ));
-        assert!(matches!(pulp.next(), Some(SecondPassEvent::Text(22, 34))));
+        assert!(matches!(
+            pulp.next(),
+            Some(SecondPassEvent::Text(22, 34, "p. with fake"))
+        ));
         assert!(matches!(pulp.next(), Some(SecondPassEvent::ParagraphEnd)));
         assert!(matches!(pulp.next(), None));
         Ok(())
