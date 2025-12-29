@@ -4,7 +4,7 @@ mod convenience;
 mod error;
 mod options;
 mod pulp {
-    mod first_pass;
+    mod pass_1;
 }
 
 pub use error::Error;
