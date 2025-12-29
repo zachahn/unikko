@@ -69,6 +69,11 @@ impl<'a> Iterator for FirstPass<'a> {
         self.position = start + delta;
 
         if starting_newline {
+            // Remove trailing newlines
+            if self.position >= self.len {
+                return None;
+            }
+
             match delta {
                 0 => Some(FirstPassEvent::Error(start, start + delta)),
                 1 => Some(FirstPassEvent::NewLine(start, start + delta)),
@@ -109,7 +114,6 @@ mod tests {
         assert!(matches!(pulp.next(), Some(FirstPassEvent::Line(31, 37))));
         assert!(matches!(pulp.next(), Some(FirstPassEvent::NewLine(37, 38))));
         assert!(matches!(pulp.next(), Some(FirstPassEvent::Line(38, 44))));
-        assert!(matches!(pulp.next(), Some(FirstPassEvent::NewLine(44, 45))));
         assert!(matches!(pulp.next(), None));
         Ok(())
     }
@@ -127,6 +131,14 @@ mod tests {
         let mut pulp = FirstPass::new("\n\nHello");
         assert!(matches!(pulp.next(), Some(FirstPassEvent::Break(0, 2))));
         assert!(matches!(pulp.next(), Some(FirstPassEvent::Line(2, 7))));
+        Ok(())
+    }
+
+    #[test]
+    fn ending_single_newline() -> Result<()> {
+        let mut pulp = FirstPass::new("Hello\n");
+        assert!(matches!(pulp.next(), Some(FirstPassEvent::Line(0, 5))));
+        assert!(matches!(pulp.next(), None));
         Ok(())
     }
 }
