@@ -8,7 +8,8 @@ use canon_fixtures::*;
 use lol_html::{doc_text, rewrite_str, RewriteStrSettings};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 fn normalized(fragment: &str) -> String {
     static REMOVE_WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\s+$").unwrap());
@@ -31,73 +32,78 @@ fn normalized(fragment: &str) -> String {
 
 #[test]
 fn textile_to_html() {
-    let mut count_total_cases = 0;
-    let mut count_total_passed = 0;
-    let mut count_total_crashes = 0;
-    let mut count_total_skipped = 0;
-    let mut printed_first_failure = false;
-    let mut passed_sets = Vec::<String>::new();
-    let mut skip_cases = HashSet::new();
-    skip_cases.insert("Basic Ordered List");
-    skip_cases.insert("Basic Unordered lists");
-    for fixture_set in FixturesRoot::new() {
-        let mut count_set_cases = 0;
-        let mut count_set_passed = 0;
-        let set_name = fixture_set.name;
-        let test_cases = fixture_set.cases;
-        let test_case_names: Vec<String> = {
-            let mut unsorted: Vec<_> = test_cases.keys().cloned().collect();
-            unsorted.sort();
-            unsorted
-        };
-        for case_name in test_case_names {
-            count_total_cases += 1;
-            count_set_cases += 1;
-            let test_case = test_cases.get(case_name.as_str()).unwrap();
-            if skip_cases.contains(case_name.as_str()) {
-                count_total_skipped += 1;
-                continue;
-            }
-            if matches!(test_case.class, Some(_)) || matches!(test_case.setup, Some(_)) {
-                count_total_skipped += 1;
-                continue;
-            }
-            let actual = unikko::textile_to_html(test_case.input.as_str());
-            if matches!(actual, Err(_)) {
-                count_total_crashes += 1;
-                continue;
-            }
-            let actual = actual.unwrap();
-            if normalized(actual.as_str()) == normalized(test_case.expect.as_str()) {
-                count_total_passed += 1;
-                count_set_passed += 1;
-                continue;
-            }
-            if !printed_first_failure {
-                println!(
-                    "➡️   FAILURE:\n- set: {}\n- case: {}\n",
-                    set_name, case_name
-                );
-                if let Some(ref note) = test_case.note {
-                    println!("➡️   NOTE:\n{}\n", note);
-                }
-                if let Some(ref setup) = test_case.setup {
-                    println!("➡️   SETUP:\n{:?}\n", setup);
-                }
-                println!("➡️   INPUT:\n{}\n\n", test_case.input);
-                println!("➡️   EXPECTED:\n{}\n\n", test_case.expect);
-                println!("➡️   ACTUAL:\n{}\n", actual);
-                printed_first_failure = true;
-            }
+    let fixtures = Fixtures::new();
+    let mut passed: Vec<Fixture> = vec![];
+    let mut skipped: Vec<Fixture> = vec![];
+    let mut errored: Vec<Fixture> = vec![];
+    let mut mismatched: Vec<Fixture> = vec![];
+
+    for fixture in fixtures {
+        if fixture.test_case.setup.is_some() {
+            skipped.push(fixture);
+            continue;
         }
-        if count_set_cases == count_set_passed {
-            passed_sets.push(set_name.clone());
+        let actual = unikko::textile_to_html(fixture.test_case.input.as_str());
+        if matches!(actual, Err(_)) {
+            errored.push(fixture);
+            continue;
         }
+        let actual = actual.unwrap();
+        if normalized(actual.as_str()) != normalized(fixture.test_case.expect.as_str()) {
+            mismatched.push(fixture);
+            continue;
+        }
+        passed.push(fixture);
     }
-    assert_eq!(count_total_crashes, 0);
-    let count_total_failed = count_total_cases - count_total_passed;
-    assert_eq!(
-        count_total_passed, count_total_cases,
-        "{count_total_failed}. passed sets: {passed_sets:?}. skipped: {count_total_skipped}, passed: {count_total_passed}. total: {count_total_cases}"
-    );
+
+    if errored.len() > 0 || mismatched.len() > 0 {
+        let mut error_examples: HashMap<PathBuf, (&Fixture, String)> = HashMap::new();
+        for fixture in &errored {
+            // Re-run to capture the error message
+            if let Err(e) = unikko::textile_to_html(fixture.test_case.input.as_str()) {
+                error_examples
+                    .entry(fixture.path.clone())
+                    .or_insert((fixture, e.to_string()));
+            }
+        }
+
+        if !error_examples.is_empty() {
+            println!("=== ERROR EXAMPLES (one per file) ===");
+            for (_path, (fixture, error_msg)) in error_examples.iter() {
+                println!("Test: {} -- {}", fixture.filename(), fixture.name);
+                println!("Input:\n{}", fixture.test_case.input);
+                println!("Expected:\n{}", fixture.test_case.expect);
+                println!("Error:\n{}", error_msg);
+                println!("{}", "=".repeat(80));
+            }
+        }
+
+        let mut mismatch_examples: HashMap<PathBuf, &Fixture> = HashMap::new();
+        for fixture in &mismatched {
+            mismatch_examples
+                .entry(fixture.path.clone())
+                .or_insert(fixture);
+        }
+
+        if !mismatch_examples.is_empty() {
+            println!("=== MISMATCH EXAMPLES (one per file) ===");
+            for (_path, fixture) in mismatch_examples.iter() {
+                println!("Test: {} -- {}", fixture.filename(), fixture.name);
+                println!("Input:\n{}", fixture.test_case.input);
+                println!("Expected:\n{}", fixture.test_case.expect);
+
+                // Re-compute actual for this example (raw HTML, not normalized)
+                let actual = unikko::textile_to_html(fixture.test_case.input.as_str()).unwrap();
+                println!("Actual:\n{}", actual);
+                println!("{}", "=".repeat(80));
+            }
+        }
+
+        println!("Summary");
+        println!("Passed: {}", passed.len());
+        println!("Skipped: {}", skipped.len());
+        println!("Errored: {}", errored.len());
+        println!("Mismatched: {}", mismatched.len());
+        panic!()
+    }
 }
